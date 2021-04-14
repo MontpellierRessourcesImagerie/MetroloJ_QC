@@ -158,9 +158,9 @@ public class camera {
             hotArray[col][row]=0.0F;
         }
     }
-    List<Double> tempWarm = new ArrayList<>();
-    List<Double> tempCold = new ArrayList<>();
-    List<Double> tempHot= new ArrayList<>();
+    List<Double> tempWarm = new ArrayList();
+    List<Double> tempCold = new ArrayList();
+    List<Double> tempHot= new ArrayList();
 
     Calibration cal = image.getCalibration().copy();
     imageTricks.setCalibrationToPixels(image);

@@ -169,7 +169,7 @@ private Overlay drawBarAsOverlay(ImagePlus ip, int x, int y, int temperature) {
     stats = imp.getStatistics(Measurements.MIN_MAX, nBins);
     histogram = stats.histogram;
     cal = imp.getCalibration();
-    int maxTextWidth = addText(null, 0, 0);
+    int maxTextWidth = addText(null, ip, 0, 0);
     windowWidth = (int)(XMARGIN*zoom) + 5 + (int)(BAR_THICKNESS*zoom) + maxTextWidth + (int)(XMARGIN/2*zoom);
 
     if (fillColor!=null) {
@@ -184,8 +184,8 @@ private Overlay drawBarAsOverlay(ImagePlus ip, int x, int y, int temperature) {
         decimalPlaces = Analyzer.getPrecision();
     x = (int)(XMARGIN*zoom) + xOffset;
     y = (int)(YMARGIN*zoom) + yOffset;
-    addVerticalColorBar(out, x, y, (int)(BAR_THICKNESS*zoom), (int)(BAR_LENGTH*zoom), temperature);
-    addText(out, x + (int)(BAR_THICKNESS*zoom), y);
+    addVerticalColorBar(out, ip.getProcessor(), x, y, (int)(BAR_THICKNESS*zoom), (int)(BAR_LENGTH*zoom), temperature);
+    addText(out, ip, x + (int)(BAR_THICKNESS*zoom), y);
         out.setIsCalibrationBar(true);
         if (ip.getCompositeMode()>0) {
             for (int i=0; i<out.size(); i++)
@@ -214,13 +214,9 @@ public void addVerticalColorBar(Overlay overlay, ImageProcessor proc, int x, int
     byte[] rLUT = new byte[256];
     byte[] gLUT = new byte[256];
     byte[] bLUT = new byte[256];
-    int[] red =new int[256];
-    int[] green =new int[256];
-    int[] blue =new int[256];
-    switch (temperature) {
-        case 4 :
-         red = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                0, 0, 0, 0, 0, 0, 1, 4, 7, 10, 
+    if (temperature==4) {
+        int[] red = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+             0, 0, 0, 0, 0, 0, 1, 4, 7, 10, 
                 13, 16, 19, 22, 25, 28, 31, 34, 37, 40, 
                 43, 46, 49, 52, 55, 58, 61, 64, 67, 70, 
             73, 76, 79, 82, 85, 88, 91, 94, 98, 101, 
@@ -245,9 +241,8 @@ public void addVerticalColorBar(Overlay overlay, ImageProcessor proc, int x, int
             255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 
             255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 
             255, 255, 255, 255, 255, 255 };
-    
-        green = { 
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+
+        int [] green = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
@@ -273,44 +268,55 @@ public void addVerticalColorBar(Overlay overlay, ImageProcessor proc, int x, int
             255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 
             255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 
             255, 255, 255, 255, 255, 255 };
-    
-        blue = {0, 7, 15, 22, 30, 38, 45, 53, 61, 65,69, 74, 78, 82, 87, 91, 96, 100, 104, 108, 113, 117, 121, 125, 130, 134, 138, 143, 147, 151, 156, 160, 165, 168, 171, 175, 178, 181, 185, 188,192, 195, 199, 202, 206, 209, 213, 216, 220, 220, 221, 222, 223, 224, 225, 226, 227, 224, 222, 220, 218, 216, 214, 212, 210, 206, 202, 199, 195, 191, 188, 184, 181, 177, 173, 169, 166, 162, 158, 154,151, 147, 143, 140, 136, 132, 129, 125, 122, 118, 114, 111, 107, 103, 100, 96, 93, 89, 85, 82,78, 74, 71, 67, 64, 60, 56, 53, 49, 45, 42, 38, 35, 31, 27, 23, 20, 16, 12, 8, 5, 4, 3, 3, 2, 1, 1, 0, 0, 0,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 8, 13, 17, 21, 26, 30, 35, 42, 50, 58, 66, 74, 82, 90, 98, 105, 113, 121, 129, 136, 
+        int [] blue= {0, 7, 15, 22, 30, 38, 45, 53, 61, 65,69, 74, 78, 82, 87, 91, 96, 100, 104, 108, 113, 117, 121, 125, 130, 134, 138, 143, 147, 151, 156, 160, 165, 168, 171, 175, 178, 181, 185, 188,192, 195, 199, 202, 206, 209, 213, 216, 220, 220, 221, 222, 223, 224, 225, 226, 227, 224, 222, 220, 218, 216, 214, 212, 210, 206, 202, 199, 195, 191, 188, 184, 181, 177, 173, 169, 166, 162, 158, 154,151, 147, 143, 140, 136, 132, 129, 125, 122, 118, 114, 111, 107, 103, 100, 96, 93, 89, 85, 82,78, 74, 71, 67, 64, 60, 56, 53, 49, 45, 42, 38, 35, 31, 27, 23, 20, 16, 12, 8, 5, 4, 3, 3, 2, 1, 1, 0, 0, 0,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 8, 13, 17, 21, 26, 30, 35, 42, 50, 58, 66, 74, 82, 90, 98, 105, 113, 121, 129, 136, 
             144, 152, 160, 167, 175, 183, 191, 199, 207, 215, 
             223, 227, 231, 235, 239, 243, 247, 251, 255, 255, 255, 255, 255, 255, 255, 255 };
-    
         for (int i = 0; i < mapSize; i++) {
             rLUT[i] = (byte)red[i];
             gLUT[i] = (byte)green[i];
             bLUT[i] = (byte)blue[i];
         } 
-        lut = new LUT(8, 256, rLUT, gLUT, bLUT);
-        break;
-        default :
-            byte[] colorLUT = new byte[256];
-            byte[] blankLUT = new byte[256];
-            int [] colorTemp=new int [256];
-            int [] blankTemp=new int [256];
-            blankTemp[0]=0;
-            colorTemp[0]=0;
-            for (int i=1; i<256; i++){
+    }
+    else {    
+        int [] colorTemp=new int [256];
+        int [] blankTemp=new int [256];
+        blankTemp[0]=0;
+        colorTemp[0]=0;
+        for (int i=1; i<256; i++){
                 colorTemp[i]=colorTemp[i-1]+1;
                 blankTemp [i]=blankTemp [0];
             }
-            for (int i = 0; i < 256; i++) {
-            rLUT[i] = (byte)red[i];
-            gLUT[i] = (byte)green[i];
-            bLUT[i] = (byte)blue[i];
-        } 
-            lut=LUT.createLutFromColor(colors[temperature]);
-            break;
+        switch(temperature){
+            case G : 
+                for (int i = 0; i < 256; i++) {
+                    rLUT[i] = (byte)blankTemp[i];
+                    gLUT[i] = (byte)colorTemp[i];
+                    bLUT[i] = (byte)blankTemp[i];
+                }
+                break;
+            case B : 
+                for (int i = 0; i < 256; i++) {
+                    rLUT[i] = (byte)blankTemp[i];
+                    gLUT[i] = (byte)blankTemp[i];
+                    bLUT[i] = (byte)colorTemp[i];
+                }
+                break; 
+            case R : 
+                for (int i = 0; i < 256; i++) {
+                    rLUT[i] = (byte)colorTemp[i];
+                    gLUT[i] = (byte)blankTemp[i];
+                    bLUT[i] = (byte)blankTemp[i];
+                }
+                break;    
+        }
     }    
-            
+    lut = new LUT(8, 256, rLUT, gLUT, bLUT);        
     proc.setColorModel((ColorModel)lut);
 
     double colorRange =  mapSize;
     int start = 0;
-    if (iproc instanceof ByteProcessor) {
-        IJ.log("(in calBar) was a ByteProcessor");
+    if (proc instanceof ByteProcessor) {
+        //IJ.log("(in calBar) was a ByteProcessor");
             int min = (int)iproc.getMin();
             if (min<0) min = 0;
             int max = (int)iproc.getMax();
@@ -335,10 +341,10 @@ public void addVerticalColorBar(Overlay overlay, ImageProcessor proc, int x, int
         }
     }
 
-    private int addText(Overlay overlay, int x, int y) {
+    private int addText(Overlay overlay, ImagePlus ip, int x, int y) {
         if (textColor == null)return 0;
-        double hmin = cal.getCValue(stats.histMin);
-        double hmax = cal.getCValue(stats.histMax);
+        double hmin = ip.getCalibration().getCValue(stats.histMin);
+        double hmax = ip.getCalibration().getCValue(stats.histMax);
         double barStep = (double)(BAR_LENGTH*zoom) ;
         if (numLabels > 2)
             barStep /= (numLabels - 1);
@@ -358,15 +364,15 @@ public void addVerticalColorBar(Overlay overlay, ImageProcessor proc, int x, int
             String s = cal.getValueUnit();
             double min = iproc.getMin();
             double max = iproc.getMax();
-            if (iproc instanceof ByteProcessor) {
-                IJ.log("(in calBar) Was a byteprocessor");
+            if (ip.getProcessor() instanceof ByteProcessor) {
+                //IJ.log("(in calBar) Was a byteprocessor");
                 if (min<0) min = 0;
                 if (max>255) max = 255;
             }
             double grayLabel = min + (max-min)/(numLabels-1) * i;
-            grayLabel = cal.getCValue(grayLabel);
-            double cmin = cal.getCValue(min);
-            double cmax = cal.getCValue(max);
+            grayLabel = ip.getCalibration().getCValue(grayLabel);
+            double cmin = ip.getCalibration().getCValue(min);
+            double cmax = ip.getCalibration().getCValue(max);
             String todisplay = d2s(grayLabel)+" "+s;
             if (overlay!=null) {
                 TextRoi label = new TextRoi(todisplay, x + 5, yLabel + fontHeight/2, font);             

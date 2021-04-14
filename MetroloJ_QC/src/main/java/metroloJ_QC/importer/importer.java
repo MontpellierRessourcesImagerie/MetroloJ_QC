@@ -19,8 +19,8 @@ public class importer {
   }
   
   public ArrayList<String> scanFiles(String path, boolean group) {
-    HashSet<String> done = new HashSet<>();
-    ArrayList<String> list = new ArrayList<>();
+    HashSet<String> done = new HashSet();
+    ArrayList<String> list = new ArrayList();
     File dir = new File(path);
     File[] files = dir.listFiles();
     IJ.showStatus("Scanning directory");
@@ -72,7 +72,7 @@ public class importer {
   }
   
   public List<int[]> group(String objectiveTag, String[] channelTags) {
-    List<int[]> tags = (List)new ArrayList<>();
+    List<int[]> tags = (List)new ArrayList();
     for (int i = 0; i < this.filesToOpen.size(); i++) {
       int[] temp = { -1, -1 };
       String name = fileTricks.cropName(fileTricks.cropExtension(this.filesToOpen.get(i))).toLowerCase();

@@ -1,10 +1,7 @@
 package metroloJ_QC.utilities;
 
-import com.google.api.client.util.GenericData;
-import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
-import ij.process.ImageProcessor;
 import ij.measure.Calibration;
 import ij.measure.ResultsTable;
 import ij.plugin.Duplicator;
@@ -13,7 +10,6 @@ import ij.plugin.filter.BackgroundSubtracter;
 import ij.plugin.filter.GaussianBlur;
 import ij.plugin.filter.MaximumFinder;
 import ij.plugin.filter.ParticleAnalyzer;
-import ij.plugin.filter.PlugInFilter;
 import ij.process.ByteProcessor;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -194,7 +190,7 @@ public class findBead {
     } 
     
     imageTricks.showROIs(image, coordinates, mjd, path);
-    ArrayList<double[]> validatedCoordinates = (ArrayList)new ArrayList<>();
+    ArrayList<double[]> validatedCoordinates = (ArrayList)new ArrayList();
     int counter=0;
     for (int j = 0; j < coordinates.length; j++) {
          rt.setValue("#", j, j);
