@@ -52,13 +52,14 @@ public class batchFieldIlluminationReport {
   
   public String[] saturationProportion;
   
-  public batchFieldIlluminationReport(ArrayList<fieldIllumination> list, microscope conditions, String title) {
+  private boolean debugMode;
+  
+  public batchFieldIlluminationReport(ArrayList<fieldIllumination> list, microscope conditions, String title, boolean debugMode) {
     this.micro = conditions;
-    this.title = this.micro.date + "\nBatch Field Illumination report";
+    this.title =title;
     this.nReports = list.size();
-    if (!title.equals(""))
-      this.title += "\n" + title; 
     this.finalResolutionTable = new double[this.micro.emWavelengths.length][3][4];
+    this.debugMode=debugMode;
   }
   
   public void aggregateFIRs(ArrayList<fieldIllumination> fis, boolean wavelengthChoice) {
@@ -130,10 +131,10 @@ public class batchFieldIlluminationReport {
       PdfWriter writer = PdfWriter.getInstance(report, new FileOutputStream(path + "summary.pdf"));
       report.open();
       writer.setStrictImageSequence(true);
-      report.add((Element)this.rs.logoRTMFM());
+      report.add((Element)this.rs.logo("bfi.png", 100.0F, debugMode));;
       String main = this.title + " - SUMMARY";
       report.add((Element)this.rs.bigTitle(main));
-      String sectionTitle = "Microscope infos:";
+      String sectionTitle = "Microscope info:";
       String text = "";
       content[][] summary = this.microSection;
       PdfPTable table = this.rs.table(summary, 95.0F, true);
@@ -161,7 +162,7 @@ public class batchFieldIlluminationReport {
       report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, table, text));
       report.newPage();
       if (!this.micro.sampleInfos.equals("")) {
-        report.add((Element)this.rs.title("Sample infos:"));
+        report.add((Element)this.rs.title("Sample info:"));
         report.add((Element)this.rs.paragraph(this.micro.sampleInfos));
       } 
       if (!this.micro.comments.equals("")) {
@@ -212,6 +213,11 @@ public class batchFieldIlluminationReport {
       columnWidths = new float[] { 10.0F, 15.0F, 35.0F };
       table.setWidths(columnWidths);
       report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, table, text));
+      report.newPage();
+      sectionTitle = "Formulas used:";
+      text = "";
+      report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, null, text));
+      report.add((Element)this.rs.logo("FI_formulas.png", 90.0F, debugMode));
       report.newPage();
       report.add((Element)this.rs.title("Analysed images:"));
       report.add((Element)this.rs.paragraph(analysedImages));

@@ -1,5 +1,6 @@
 package metroloJ_QC.coalignement;
 
+import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
 import ij.gui.NewImage;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import metroloJ_QC.report.utilities.content;
+import metroloJ_QC.setup.metroloJDialog;
 import metroloJ_QC.setup.microscope;
 import metroloJ_QC.utilities.doCheck;
 import metroloJ_QC.utilities.findCentre;
@@ -62,7 +64,9 @@ public class coAlignement {
   
   public boolean result = false;
   
-  public coAlignement(ImagePlus image, microscope conditions, boolean saturationChoice, String originalImageName) {
+  public double [] anulusThickness;
+  
+  public coAlignement(ImagePlus image, microscope conditions, metroloJDialog mjd, String originalImageName, String creationDate) {
     this.result = false;
     this.micro = conditions;
     if ((image.getCalibration()).pixelDepth != conditions.cal.pixelDepth || (image.getCalibration()).pixelHeight != conditions.cal.pixelHeight || (image.getCalibration()).pixelWidth != conditions.cal.pixelWidth) {
@@ -79,21 +83,25 @@ public class coAlignement {
     this.combinations = (new generateCombinations(nChannels, 2)).getCombinations();
     this.saturation = new double[this.micro.emWavelengths.length];
     this.SBRatio = new double[this.micro.emWavelengths.length];
+    this.anulusThickness=new double[this.micro.emWavelengths.length];
     for (int i = 0; i < this.micro.emWavelengths.length; i++) {
-      double[] temp = doCheck.computeRatios(this.ip[i], this.micro.bitDepth);
+
+      double[] temp = doCheck.computeRatios(this.ip[i], mjd);
       this.saturation[i] = temp[0];
       this.SBRatio[i] = temp[1];
+      this.anulusThickness[i]=temp[2];
+      
     } 
-    this.result = validCombinationFound(saturationChoice);
+    this.result = validCombinationFound(mjd.saturationChoice);
     if (this.result) {
       String name = fileTricks.cropName(image.getShortTitle());
       if (name.contains("DUP_"))
         name = name.substring(4); 
-      this.micro.getSpecs(name, this.saturation);
+      this.micro.getSpecs(name, this.saturation, creationDate);
       this.microSection = this.micro.reportHeader;
-      this.beadCentres = getCentres(this.ip, saturationChoice);
+      this.beadCentres = getCentres(this.ip, mjd.saturationChoice);
       for (int j = 0; j < this.combinations.size(); j++)
-        getDist(j, saturationChoice); 
+        getDist(j, mjd.saturationChoice); 
     } 
   }
   
@@ -180,8 +188,8 @@ public class coAlignement {
       output[0][i + 1] = new content("Channel " + i, 0);
       i++;
     } 
-    output[this.micro.emWavelengths.length + 1][0] = new content("Resolutions (", 0);
-    output[this.micro.emWavelengths.length + 2][0] = new content("Centres'coord.(", 0);
+    output[this.micro.emWavelengths.length + 1][0] = new content("Resolutions ("+IJ.micronSymbol+"m)", 0);
+    output[this.micro.emWavelengths.length + 2][0] = new content("Centres'coord.("+IJ.micronSymbol+"m)", 0);
     output[this.micro.emWavelengths.length + 3][0] = new content("Title", 0);
     for (i = 0; i < this.micro.emWavelengths.length; i++) {
       output[i + 1][0] = new content("Channel " + i, 0);
@@ -312,8 +320,8 @@ public class coAlignement {
       output[0][i + 1] = new content("Channel " + i, 0);
       i++;
     } 
-    output[this.micro.emWavelengths.length + 1][0] = new content("Resolutions (", 0);
-    output[this.micro.emWavelengths.length + 2][0] = new content("Centres'coord.(", 0);
+    output[this.micro.emWavelengths.length + 1][0] = new content("Resolutions ("+IJ.micronSymbol+"m)", 0);
+    output[this.micro.emWavelengths.length + 2][0] = new content("Centres'coord.("+IJ.micronSymbol+"m)", 0);
     output[this.micro.emWavelengths.length + 3][0] = new content("Title", 0);
     for (i = 0; i < this.micro.emWavelengths.length; i++) {
       output[i + 1][0] = new content("Channel " + i, 0);
@@ -352,8 +360,8 @@ public class coAlignement {
       output[0][i + 1] = new content("Channel " + i, 0);
       i++;
     } 
-    output[this.micro.emWavelengths.length + 1][0] = new content("Resolutions (", 0);
-    output[this.micro.emWavelengths.length + 2][0] = new content("Bead centres'coord.", 0);
+    output[this.micro.emWavelengths.length + 1][0] = new content("Resolutions ("+IJ.micronSymbol+"m)", 0);
+    output[this.micro.emWavelengths.length + 2][0] = new content("Bead centres'coord.("+IJ.micronSymbol+"m)", 0);
     output[this.micro.emWavelengths.length + 3][0] = new content("Bead quality (SB Ratio)", 0);
     output[this.micro.emWavelengths.length + 4][0] = new content("Title", 0);
     for (i = 0; i < this.micro.emWavelengths.length; i++) {

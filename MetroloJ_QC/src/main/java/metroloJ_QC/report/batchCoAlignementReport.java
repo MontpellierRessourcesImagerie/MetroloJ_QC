@@ -72,17 +72,18 @@ public class batchCoAlignementReport {
   
   public String[][] samplingProportion;
   
-  public batchCoAlignementReport(ArrayList<coAlignement> list, microscope conditions, String title) {
+  private boolean debugMode;
+  
+  public batchCoAlignementReport(ArrayList<coAlignement> list, microscope conditions, String title, boolean debugMode) {
     this.micro = conditions;
+    this.debugMode=debugMode;
     this.saturationProportion = new String[this.micro.emWavelengths.length];
     this.samplingProportion = new String[this.micro.emWavelengths.length][3];
-    this.title = this.micro.date + "\nBatch Co-Alignement report";
+    this.title = title;
     this.combinations = ((coAlignement)list.get(0)).combinations;
     this.refWavelengths = ((coAlignement)list.get(0)).refWavelengths;
     this.refDist = ((coAlignement)list.get(0)).refDist;
     this.nReports = list.size();
-    if (!title.equals(""))
-      this.title += "\n" + title; 
   }
   
   public void compileCoARs(ArrayList<coAlignement> coas, metroloJDialog mjd, double ratioTolerance) {
@@ -404,10 +405,10 @@ public class batchCoAlignementReport {
       PdfWriter writer = PdfWriter.getInstance(report, new FileOutputStream(path + File.separator + "summary.pdf"));
       report.open();
       writer.setStrictImageSequence(true);
-      report.add((Element)this.rs.logoRTMFM());
+      report.add((Element)this.rs.logo("bcoa.png", 100.0F, debugMode));
       String main = this.title + " - SUMMARY";
       report.add((Element)this.rs.bigTitle(main));
-      String sectionTitle = "Microscope infos:";
+      String sectionTitle = "Microscope info:";
       String text = "";
       content[][] summary = this.microSection;
       PdfPTable table = this.rs.table(summary, 95.0F, true);
@@ -463,13 +464,14 @@ public class batchCoAlignementReport {
       } 
       report.newPage();
       if (!this.micro.sampleInfos.isEmpty()) {
-        report.add((Element)this.rs.title("Sample infos:"));
+        report.add((Element)this.rs.title("Sample info:"));
         report.add((Element)this.rs.paragraph(this.micro.sampleInfos));
       } 
       if (!this.micro.comments.isEmpty()) {
         report.add((Element)this.rs.title("Comments:"));
         report.add((Element)this.rs.paragraph(this.micro.comments));
       } 
+      mjd.finalAnulusThickness=""+dataTricks.round(mjd.anulusThickness, 2)+" (theoretical, see individual reports for real, used values)";
       mjd.compileDialogHeader(path);
       if (mjd.useTolerance) {
         rows = mjd.dialogHeader.length + 3;
@@ -506,6 +508,27 @@ public class batchCoAlignementReport {
       columnWidths = new float[] { 10.0F, 15.0F, 35.0F };
       table.setWidths(columnWidths);
       report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, table, text));
+      report.newPage();
+      sectionTitle = "Formulas used:";
+      text = "";
+      String temp="COA_";
+      switch (mjd.microtype){
+        case microscope.WIDEFIELD: 
+            temp+="WIDEFIELD";
+            break;
+        case microscope.CONFOCAL: 
+            temp+="CONFOCAL";
+            break;
+        case microscope.SPINNING: 
+            temp+="SPINNING";
+            break;
+        case microscope.MULTIPHOTON: 
+            temp+="MULTIPHOTON";
+            break;
+        }
+        temp+="_formulas.png";
+        report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, null, text));
+        report.add((Element)this.rs.logo(temp, 90.0F, debugMode));
       report.newPage();
       report.add((Element)this.rs.title("Analysed images & beads:"));
       report.add((Element)this.rs.paragraph(analysedImages));

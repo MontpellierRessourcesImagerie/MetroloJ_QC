@@ -3,6 +3,9 @@ package metroloJ_QC.report;
 import metroloJ_QC.setup.microscope;
 import metroloJ_QC.utilities.doCheck;
 import metroloJ_QC.utilities.tricks.dataTricks;
+import metroloJ_QC.setup.metroloJDialog;
+import metroloJ_QC.coalignement.coAlignement;
+import metroloJ_QC.resolution.PSFprofiler;
 import ij.IJ;
 
 public class warnings {
@@ -107,4 +110,27 @@ public class warnings {
     } 
     return output;
   }
+  
+  public static String simplifiedAnulusSizeWarnings(metroloJDialog mjd, coAlignement coa){
+      String output="";
+      Double totalSize=mjd.beadSize+(2*mjd.anulusThickness);
+      Double boxSize=Math.min(coa.ip[0].getHeight()*coa.micro.cal.pixelHeight,coa.ip[0].getWidth()*coa.micro.cal.pixelWidth);
+      if (totalSize>boxSize) output="The anulus drawn around the bead to compute the background mean intensity is bigger than the image. Increase the cropfactor or decrease the anulus thickness";
+      return output;
+  }
+    public static String anulusSizeWarnings(metroloJDialog mjd, PSFprofiler pp){
+        String output="";
+        Double boxSize=Math.min(pp.ip[0].getHeight()*pp.micro.cal.pixelHeight,pp.ip[0].getWidth()*pp.micro.cal.pixelWidth);
+        Double [] totalSize=new Double [pp.micro.emWavelengths.length];
+        for (int i=0; i<pp.micro.emWavelengths.length; i++) {
+              totalSize[i]=(2.0D*Math.sqrt(2.0D)*pp.micro.resolutions.get(i)[0])+(2*mjd.anulusThickness);
+                if (totalSize[i]>boxSize){ 
+                    if (output.isEmpty()) output+="The anulus drawn around the bead to compute the background mean intensity is bigger than the image (channel "+i;
+                    else output+=", channel "+i;
+                }
+                if (!output.isEmpty()) output+=").";
+        }
+      return output;
+  }
+  
 }

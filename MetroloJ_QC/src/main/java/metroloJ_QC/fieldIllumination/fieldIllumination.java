@@ -67,7 +67,7 @@ public class fieldIllumination {
   
   public boolean result = false;
   
-  public fieldIllumination(ImagePlus image, microscope conditions, boolean gaussianBlurChoice, double stepWidth, boolean thresholdChoice, boolean saturationChoice, boolean wavelengthChoice) {
+  public fieldIllumination(ImagePlus image, microscope conditions, boolean gaussianBlurChoice, double stepWidth, boolean thresholdChoice, boolean saturationChoice, boolean wavelengthChoice, String creationDate) {
     if (!image.getShortTitle().isEmpty())
       this.originalImageName = image.getShortTitle(); 
     this.result = false;
@@ -101,7 +101,7 @@ public class fieldIllumination {
     } 
     this.result = doCheck.validChannelFound(saturationChoice, this.saturation);
     if (this.result) {
-      this.micro.getSimplifiedSpecs(name, this.saturation);
+      this.micro.getSimplifiedSpecs(name, this.saturation, creationDate);
       if (wavelengthChoice)
         this.micro.purgeReportHeader(); 
       this.microSection = this.micro.reportHeader;
@@ -240,10 +240,10 @@ public class fieldIllumination {
       this.diag_TR_BL[i] = getProfile(this.ip[i], new Line(this.w - 1, 0, 0, this.h - 1));
       this.horiz[i] = getProfile(this.ip[i], new Line(0, this.h / 2 - 1, this.w - 1, this.h / 2 - 1));
       this.vert[i] = getProfile(this.ip[i], new Line(this.w / 2 - 1, 0, this.w / 2 - 1, this.h - 1));
-      double[] minima = { dataTricks.min(this.diag_TL_BR[i][1]), dataTricks.min(this.diag_TR_BL[i][1]), dataTricks.min(this.horiz[i][1]), dataTricks.min(this.vert[i][1]) };
-      double min = dataTricks.min(minima);
-      double[] maxima = { dataTricks.max(this.diag_TL_BR[i][1]), dataTricks.max(this.diag_TR_BL[i][1]), dataTricks.max(this.horiz[i][1]), dataTricks.max(this.vert[i][1]) };
-      double max = dataTricks.min(maxima);
+      double[] minima = { dataTricks.getMin(this.diag_TL_BR[i][1]), dataTricks.getMin(this.diag_TR_BL[i][1]), dataTricks.getMin(this.horiz[i][1]), dataTricks.getMin(this.vert[i][1]) };
+      double min = dataTricks.getMin(minima);
+      double[] maxima = { dataTricks.getMax(this.diag_TL_BR[i][1]), dataTricks.getMax(this.diag_TR_BL[i][1]), dataTricks.getMax(this.horiz[i][1]), dataTricks.getMax(this.vert[i][1]) };
+      double max = dataTricks.getMin(maxima);
       Plot plot = new Plot("Field illumination profiles channel " + i, "Distance to image center", "Intensity", this.diag_TL_BR[i][0], this.diag_TL_BR[i][1]);
       plot.setLimits(this.diag_TL_BR[i][0][0], this.diag_TL_BR[i][0][(this.diag_TL_BR[i][0]).length - 1], min, max);
       plot.setSize(600, 400);

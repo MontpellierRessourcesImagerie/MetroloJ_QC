@@ -60,12 +60,12 @@ public class detector {
     this.date = df.format(Calendar.getInstance().getTime()).toString();
   }
   
-  public void getSpecs(String name, double[] saturation, Double channelChoice) {
+  public void getSpecs(String name, double[] saturation, Double channelChoice, String creationDate) {
     int base, rows = 0;
     if (this.conversionFactor.isNaN()) {
-      base = 3;
-    } else {
       base = 4;
+    } else {
+      base = 5;
     } 
     if (this.channels.length == 1 || !channelChoice.isNaN()) {
       rows = base + 1;
@@ -77,18 +77,21 @@ public class detector {
     temp[0][0] = new content("Image", 6, 1, 2);
     temp[0][1] = new content();
     temp[0][2] = new content(name, 5);
-    temp[1][0] = new content("Detector", 6, 1, 2);
+    temp[1][0] = new content("(found) image's creation date", 6, 1, 2);
     temp[1][1] = new content();
-    temp[1][2] = new content("" + TYPE[this.detectorType], 5);
-    temp[2][0] = new content("Detector output bit depth", 6, 1, 2);
+    temp[1][2] = new content(creationDate, 5);
+    temp[2][0] = new content("Detector", 6, 1, 2);
     temp[2][1] = new content();
-    temp[2][2] = new content("" + this.bitDepth, 5);
-    int refRow = 3;
+    temp[2][2] = new content("" + TYPE[this.detectorType], 5);
+    temp[3][0] = new content("Detector output bit depth", 6, 1, 2);
+    temp[3][1] = new content();
+    temp[3][2] = new content("" + this.bitDepth, 5);
+    int refRow = 4;
     if (!this.conversionFactor.isNaN()) {
-      temp[3][0] = new content("Conversion Factor (e-/ADU)", 6, 1, 2);
-      temp[3][1] = new content();
-      temp[3][2] = new content("" + dataTricks.round(this.conversionFactor.doubleValue(), 2), 5);
-      refRow = 4;
+      temp[4][0] = new content("Conversion Factor (e-/ADU)", 6, 1, 2);
+      temp[4][1] = new content();
+      temp[4][2] = new content("" + dataTricks.round(this.conversionFactor.doubleValue(), 2), 5);
+      refRow = 5;
     } 
     if (this.channels.length == 1 || !channelChoice.isNaN()) {
       int channelToAnalyse;

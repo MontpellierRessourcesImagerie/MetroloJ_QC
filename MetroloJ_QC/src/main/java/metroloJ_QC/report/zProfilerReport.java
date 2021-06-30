@@ -18,17 +18,22 @@ import metroloJ_QC.setup.microscope;
 
 public class zProfilerReport {
   microscope micro;
-  
+  String creationDate="";
   ReportSections rs = new ReportSections();
   
   zProfiler zp;
   
   String title = "";
   
-  public zProfilerReport(metroloJDialog mjd, String title, microscope micro, int fitChoice) {
+  boolean debugMode;
+  
+  public zProfilerReport(metroloJDialog mjd, String title, microscope micro, int fitChoice, String creationDate, boolean debugMode) {
+    this.creationDate=creationDate;
     this.micro = micro;
-    this.zp = new zProfiler(mjd.ip, mjd.ip.getRoi(), micro, fitChoice);
-    this.title = micro.date + "\nAxial resolution report\n" + title;
+    this.zp = new zProfiler(mjd.ip, mjd.ip.getRoi(), micro, fitChoice, this.creationDate);
+    this.title = title;
+    this.debugMode=debugMode;
+    
   }
   
   public void saveReport(String path, metroloJDialog mjd) {
@@ -40,13 +45,13 @@ public class zProfilerReport {
         PdfWriter writer = PdfWriter.getInstance(report, new FileOutputStream(path));
         report.open();
         writer.setStrictImageSequence(true);
-        report.add((Element)this.rs.logoRTMFM());
+        report.add((Element)this.rs.logo("zp.png", 100.0F, debugMode));
         if (mjd.shorten) {
           report.add((Element)this.rs.bigTitle(this.title + " (SHORT)"));
         } else {
           report.add((Element)this.rs.bigTitle(this.title));
         } 
-        String sectionTitle = "Microscope infos:";
+        String sectionTitle = "Microscope info:";
         String text = "";
         content[][] summary = this.zp.microSection;
         PdfPTable table = this.rs.table(summary, 95.0F, true);
@@ -86,22 +91,42 @@ public class zProfilerReport {
         } 
         report.newPage();
         if (!this.micro.sampleInfos.equals("")) {
-          report.add((Element)this.rs.title("Sample infos:"));
+          report.add((Element)this.rs.title("Sample info:"));
           report.add((Element)this.rs.paragraph(this.micro.sampleInfos));
         } 
         if (!this.micro.comments.equals("")) {
           report.add((Element)this.rs.title("Comments:"));
           report.add((Element)this.rs.paragraph(this.micro.comments));
         } 
-        mjd.compileDialogHeader(path.substring(0, path.lastIndexOf(".pdf")));
+        mjd.compileDialogHeader(path);
         sectionTitle = "Analysis parameters";
         text = "";
-        summary = content.subtable(mjd.dialogHeader, 0, 4, 0, 2);
+        summary = content.subtable(mjd.dialogHeader, 0, 7, 0, 2);
         table = this.rs.table(summary, 80.0F, true);
         columnWidths = new float[] { 10.0F, 15.0F, 35.0F };
         table.setWidths(columnWidths);
         report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, table, text));
-        report.close();
+        report.newPage();
+        sectionTitle = "Formulas used:";
+        text = "";
+        String temp="ZP_";
+        switch (mjd.microtype){
+        case microscope.WIDEFIELD: 
+            temp+="WIDEFIELD";
+            break;
+        case microscope.CONFOCAL: 
+            temp+="CONFOCAL";
+            break;
+        case microscope.SPINNING: 
+            temp+="SPINNING";
+            break;
+        case microscope.MULTIPHOTON: 
+            temp+="MULTIPHOTON";
+            break;
+        }
+        temp+="_formulas.png";
+        report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, null, text));
+        report.add((Element)this.rs.logo(temp, 90.0F, debugMode));
         report.close();
       } catch (FileNotFoundException|com.itextpdf.text.DocumentException ex) {
         IJ.error("Error occured while generating/saving the report");

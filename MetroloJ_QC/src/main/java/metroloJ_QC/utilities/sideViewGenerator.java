@@ -72,49 +72,62 @@ public class sideViewGenerator {
   }
   
   public ImagePlus getPanelView(int projType, boolean keepCalibration, boolean addScaleBar, int size, boolean addCross, double[] coordCross, int crossRadius) {
-    Font font = new Font("Times New Roman", 1, 8);
+    Font font = new Font("Arial", 1, 8);
     Calibration cal = this.ip.getCalibration();
     double xzRatio = cal.pixelDepth / cal.pixelWidth;
     double yzRatio = cal.pixelDepth / cal.pixelHeight;
     ImageProcessor xy = getXYview(projType).getProcessor();
-    if (this.sqrtChoice)
-      xy.invert(); 
+    xy.setColor(Color.white);
+    xy.setFont(font);
     if (addCross) {
+      xy.setColor(Color.yellow);  
       int[] coord = new int[2];
       coord[0] = (int)(coordCross[0] + 0.5D);
       coord[1] = (int)(coordCross[1] + 0.5D);
       imageTricks.addCross(xy, coord, crossRadius);
+      xy.setColor(Color.white);
     } 
-    xy.setColor(Color.yellow);
-    xy.setFont(font);
+    if (this.sqrtChoice) {
+        xy.invert();
+        xy.setColor(Color.black);
+    }
     xy.drawString("XY", 3, 15);
     if (addScaleBar)
-      imageTricks.addScaleBar(xy, cal, size, 1); 
+      imageTricks.addScaleBar(xy, cal, size, 1);
+    
     ImageProcessor xz = getXZview(projType, keepCalibration).getProcessor();
-    if (this.sqrtChoice)
-      xz.invert(); 
+    xz.setFont(font);
     if (addCross) {
+      xz.setColor(Color.yellow);
       int[] coord = new int[2];
       coord[0] = (int)(coordCross[0] + 0.5D);
       coord[1] = keepCalibration ? (int)(xzRatio * (coordCross[2] + 0.5D)) : (int)(coordCross[2] + 0.5D);
       imageTricks.addCross(xz, coord, crossRadius);
+      xz.setColor(Color.white);
     } 
-    xz.setColor(Color.yellow);
-    xz.setFont(font);
+    if (this.sqrtChoice){
+        xz.invert(); 
+        xz.setColor(Color.black);
+    }
     xz.drawString("XZ", 3, 15);
+    
     ImageProcessor yz = getYZview(projType, keepCalibration).getProcessor().rotateRight();
     yz.flipHorizontal();
-    if (this.sqrtChoice)
-      yz.invert(); 
+    yz.setFont(font);
     if (addCross) {
+      yz.setColor(Color.yellow);
       int[] coord = new int[2];
       coord[0] = keepCalibration ? (int)(yzRatio * (coordCross[2] + 0.5D)) : (int)(coordCross[2] + 0.5D);
       coord[1] = (int)(coordCross[1] + 0.5D);
       imageTricks.addCross(yz, coord, crossRadius);
+      yz.setColor(Color.white);
     } 
-    yz.setColor(Color.yellow);
-    yz.setFont(font);
+    if (this.sqrtChoice){
+        yz.invert();
+        yz.setColor(Color.black);
+    }
     yz.drawString("YZ", 3, 15);
+    
     ImageProcessor iproc = xy.createProcessor(xy.getWidth() + 10 + yz.getWidth(), xy.getHeight() + 10 + xz.getHeight());
     iproc.setColorModel(iproc.getDefaultColorModel());
     iproc.setColor(Color.white);

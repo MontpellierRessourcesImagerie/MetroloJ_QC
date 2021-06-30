@@ -3,13 +3,28 @@ package metroloJ_QC.importer;
 import ij.IJ;
 import java.io.File;
 import java.io.IOException;
+import java.security.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import loci.formats.FilePattern;
+import loci.formats.FormatException;
 import loci.formats.ImageReader;
+import loci.formats.MetadataTools;
+import loci.formats.meta.IMetadata;
 import loci.plugins.LociImporter;
+import loci.plugins.util.ImageProcessorReader;
 import metroloJ_QC.utilities.tricks.fileTricks;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 
 public class importer {
   public ArrayList<String> filesToOpen = null;
@@ -64,12 +79,44 @@ public class importer {
     } 
   }
   
-  public void openImage(int n, boolean group) {
+  public String openImage(int n, boolean group, boolean open, boolean debugMode) {
     String id = this.filesToOpen.get(n);
-    String params = "location=[Local machine] windowless=true groupFiles=" + group + " open=[" + id + "] ";
-    (new LociImporter()).run(params);
-    IJ.showStatus("");
+    if (debugMode)IJ.log("(in importer>openImage) image name "+id+",\ngroup files "+ group+", open file "+open);
+    String output="";
+    output=getMetaData(id, debugMode);
+    if (debugMode)IJ.log("(in importer>openImage) image creation date "+output);
+    if (open) {
+        String params = "location=[Local machine] windowless=true groupFiles=" + group + " open=[" + id + "] ";
+        (new LociImporter()).run(params);
+        IJ.showStatus("");
+    }
+    return(output);
   }
+  
+  public static String getMetaData(String id, boolean debugMode) {
+	String output="";
+        ImageProcessorReader reader = new ImageProcessorReader();
+	IMetadata omeMeta = MetadataTools.createOMEXMLMetadata();
+	reader.setMetadataStore(omeMeta);
+      try {
+          reader.setId(id);
+          ome.xml.model.primitives.Timestamp ts =null;
+            if (ts!=null) {
+                ts = omeMeta.getImageAcquisitionDate(0);
+                if (debugMode)IJ.log("(in importer>getMetaData) ImageAcquisitionDate "+ ts.toString());
+                DateTime dt=ts.asDateTime(DateTimeZone.getDefault());
+                String pattern = "yyyy-MM-dd hh:mm:ss";
+                DateTimeFormatter formatter = DateTimeFormat.forPattern(pattern);
+                output = formatter.print(dt);
+                output+=" (from Metadata)";
+            }
+      } catch (FormatException ex) {
+          Logger.getLogger(importer.class.getName()).log(Level.SEVERE, null, ex);
+      } catch (IOException ex) {
+          Logger.getLogger(importer.class.getName()).log(Level.SEVERE, null, ex);
+      }
+	return (output);
+}
   
   public List<int[]> group(String objectiveTag, String[] channelTags) {
     List<int[]> tags = (List)new ArrayList();

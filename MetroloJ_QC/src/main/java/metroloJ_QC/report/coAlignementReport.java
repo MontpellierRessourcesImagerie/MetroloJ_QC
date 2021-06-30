@@ -21,17 +21,21 @@ public class coAlignementReport {
   
   ReportSections rs = new ReportSections();
   
+  String creationDate="";
   public coAlignement coa;
   
   String title = "";
   
-  public coAlignementReport(ImagePlus ip, microscope microscope1, String title, boolean saturationChoice, String originalImageName) {
-    this.micro = microscope1;
+  private boolean debugMode;
+  
+  public coAlignementReport(ImagePlus ip, microscope microscope, String title, metroloJDialog mjd, String originalImageName, String creationDate, boolean debugMode) {
+    this.creationDate=creationDate;
+    this.debugMode=debugMode;
+    this.micro = microscope;
     this.micro.cal = ip.getCalibration();
-    this.coa = new coAlignement(ip, this.micro, saturationChoice, originalImageName);
-    this.title = this.micro.date + "\nCo-Alignement report";
-    if (!title.equals(""))
-      this.title += "\n" + title; 
+    this.coa = new coAlignement(ip, this.micro, mjd, originalImageName, this.creationDate);
+    this.title = title; 
+    
   }
   
   public void saveReport(String path, metroloJDialog mjd, double ratioTolerance) {
@@ -47,13 +51,13 @@ public class coAlignementReport {
         PdfWriter writer = PdfWriter.getInstance(report, new FileOutputStream(path));
         report.open();
         writer.setStrictImageSequence(true);
-        report.add((Element)this.rs.logoRTMFM());
+        report.add((Element)this.rs.logo("coa.png", 100.0F, debugMode));
         if (mjd.shorten) {
           report.add((Element)this.rs.bigTitle(this.title + " (SHORT)"));
         } else {
           report.add((Element)this.rs.bigTitle(this.title));
         } 
-        String sectionTitle = "Microscope infos:";
+        String sectionTitle = "Microscope info:";
         String text = "";
         content[][] summary = this.coa.microSection;
         PdfPTable table = this.rs.table(summary, 95.0F, true);
@@ -70,7 +74,7 @@ public class coAlignementReport {
         text = text + "\n" + warnings.beadSizeWarnings(mjd.beadSize, this.coa.micro, 1);
         report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, null, text));
         sectionTitle = "Ratios table:";
-        text = "";
+        text = warnings.simplifiedAnulusSizeWarnings(mjd, coa);
         table = this.rs.table(this.coa.getRatiosArray(ratioTolerance, mjd.saturationChoice), 95.0F, mjd.useTolerance);
         if (mjd.useTolerance)
           text = text + "Green: within specifications, red: outside specifications (ie. ratio above " + ratioTolerance + ")"; 
@@ -101,14 +105,15 @@ public class coAlignementReport {
         } 
         report.newPage();
         if (!this.micro.sampleInfos.equals("")) {
-          report.add((Element)this.rs.title("Sample infos:"));
+          report.add((Element)this.rs.title("Sample info:"));
           report.add((Element)this.rs.paragraph(this.micro.sampleInfos));
         } 
         if (!this.micro.comments.equals("")) {
           report.add((Element)this.rs.title("Comments:"));
           report.add((Element)this.rs.paragraph(this.micro.comments));
-        } 
-        mjd.compileDialogHeader(path.substring(0, path.lastIndexOf(".pdf")));
+        }
+        mjd.computeFinalAnulusThickness(coa.anulusThickness);
+        mjd.compileDialogHeader(path);
         if (mjd.useTolerance) {
           rows = mjd.dialogHeader.length + 2;
         } else {
@@ -141,6 +146,27 @@ public class coAlignementReport {
         columnWidths = new float[] { 10.0F, 15.0F, 35.0F };
         table.setWidths(columnWidths);
         report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, table, text));
+        report.newPage();
+        sectionTitle = "Formulas used:";
+        text = "";
+        String temp="COA_";
+        switch (mjd.microtype){
+            case microscope.WIDEFIELD: 
+                temp+="WIDEFIELD";
+                break;
+            case microscope.CONFOCAL: 
+                temp+="CONFOCAL";
+                break;
+            case microscope.SPINNING: 
+                temp+="SPINNING";
+                break;
+            case microscope.MULTIPHOTON: 
+                temp+="MULTIPHOTON";
+                break;
+            }
+        temp+="_formulas.png";
+        report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, null, text));
+        report.add((Element)this.rs.logo(temp, 90.0F, debugMode));
         report.close();
       } catch (FileNotFoundException|com.itextpdf.text.DocumentException ex) {
         IJ.error("Error occured while generating/saving the report");

@@ -12,6 +12,7 @@ package metroloJ_QC.resolution;
   public class resR2 {
    Double res=Double.NaN;
    Double R2=Double.NaN;
+   Double SBR=Double.NaN;
    
   public resR2() {
 
@@ -19,16 +20,32 @@ package metroloJ_QC.resolution;
     public resR2(Double[] value) {
     this.res = value[0];
     this.R2 = value[1];
+    this.SBR=value[2];
   }  
+    
+    public resR2(Double res, Double R2, Double SBR) {
+    this.res = res;
+    this.R2 = R2;
+    this.SBR = SBR;
+  } 
     
     public resR2 createResR2(Double[] value) {
     resR2 output= new resR2(value);
     return output;
   }  
+    
+    public resR2 createResR2(Double res, Double R2, Double SBR) {
+    resR2 output= new resR2(res, R2, SBR);
+    return output;
+  }
     public Double getRes(){
         return res;
     }
     public Double getR2(){
         return R2;
     }
+    public Double getSBR(){
+        return SBR;
+    }
+    
    }

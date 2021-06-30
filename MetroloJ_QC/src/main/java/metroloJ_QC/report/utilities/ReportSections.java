@@ -11,10 +11,15 @@ import com.itextpdf.text.Phrase;
 import com.itextpdf.text.pdf.PdfPCell;
 import com.itextpdf.text.pdf.PdfPTable;
 import ij.ImagePlus;
+import ij.IJ;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
+import javax.imageio.ImageIO;
 
 public class ReportSections {
   public int TITLE = 1;
@@ -24,9 +29,29 @@ public class ReportSections {
   public Image logoRTMFM() {
     Image logo = null;
     try {
-      logo = Image.getInstance(getClass().getResource("/metroloJ_QC/resources/logo_RT-MFM.jpg"));
+      String fileName = "images/logo_RT-MFM.jpg";      
+      logo = Image.getInstance(this.getClass().getClassLoader().getResource(fileName));
       logo.setAlignment(1);
       logo.scalePercent(30.0F);
+    } catch (BadElementException ex) {
+      Logger.getLogger(ReportSections.class.getName()).log(Level.SEVERE, (String)null, (Throwable)ex);
+    } catch (MalformedURLException ex) {
+      Logger.getLogger(ReportSections.class.getName()).log(Level.SEVERE, (String)null, ex);
+    } catch (IOException ex) {
+      Logger.getLogger(ReportSections.class.getName()).log(Level.SEVERE, (String)null, ex);
+    } 
+    return logo;
+  }
+  
+  public Image logo(String name, Float size, boolean debugMode) {
+    Image logo = null;
+    try {
+      String fileName = "images/"+name;
+      //String fileName = "images/pp.png"; 
+      if (debugMode) IJ.log("(in ReportSections>logo) filename "+fileName);
+      logo = Image.getInstance(this.getClass().getClassLoader().getResource(fileName));
+      logo.setAlignment(1);
+      logo.scalePercent(size);
     } catch (BadElementException ex) {
       Logger.getLogger(ReportSections.class.getName()).log(Level.SEVERE, (String)null, (Throwable)ex);
     } catch (MalformedURLException ex) {

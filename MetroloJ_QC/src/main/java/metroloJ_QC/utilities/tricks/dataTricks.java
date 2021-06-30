@@ -1,5 +1,6 @@
 package metroloJ_QC.utilities.tricks;
 
+import ij.IJ;
 import ij.measure.Calibration;
 import java.util.ArrayList;
 import metroloJ_QC.resolution.resR2;
@@ -40,20 +41,28 @@ public class dataTricks {
     return Math.sqrt((coord2[0] - coord1[0]) * (coord2[0] - coord1[0]) + (coord2[1] - coord1[1]) * (coord2[1] - coord1[1]));
   }
   
-  public static double min(double[] input) {
-    return extremum(0, input);
+  public static Double getMin(double[] input) {
+    return getExtremum(0, input);
   }
   
-  public static int min(int[] input) {
-    return extremum(0, input);
+  public static int getMin(int[] input) {
+    return dataTricks.getExtremum(0, input);
   }
   
-  public static double max(double[] input) {
-    return extremum(1, input);
+  public static double min(List<Double> input) {
+    return dataTricks.getExtremum(0, input);
   }
   
-  public static int max(int[] input) {
-    return extremum(1, input);
+  public static double getMax(double[] input) {
+    return getExtremum(1, input);
+  }
+  
+  public static int getMax(int[] input) {
+    return dataTricks.getExtremum(1, input);
+  }
+  
+  public static Double getMax(List<Double> input) {
+    return dataTricks.getExtremum(0, input);
   }
   
   public static double[] transTypeInt2Double(int[] array) {
@@ -65,7 +74,7 @@ public class dataTricks {
     return out;
   }
   
-  private static double extremum(int type, double[] input) {
+  private static double getExtremum(int type, double[] input) {
     double out = input[0];
     for (int i = 1; i < input.length; i++) {
       switch (type) {
@@ -79,8 +88,27 @@ public class dataTricks {
     } 
     return out;
   }
-  
-  private static int extremum(int type, int[] input) {
+  private static Double getExtremum(int type, List<Double> input) {
+    if (input.isEmpty()) return (Double.NaN);
+    else {
+        Double out = input.get(0);
+        for (int i = 1; i < input.size(); i++) {
+            if (out.isNaN())out=input.get(i);
+            else {
+                switch (type) {
+                    case 0:
+                        out = Math.min(out, input.get(i));
+                        break;
+                    case 1:
+                        out = Math.max(out, input.get(i));
+                        break;
+                } 
+            }
+        }    
+        return out;
+    }    
+  }
+  private static int getExtremum(int type, int[] input) {
     int out = input[0];
     for (int i = 1; i < input.length; i++) {
       switch (type) {
@@ -139,17 +167,23 @@ public class dataTricks {
     return output;
   }
   
-   public static List<Double[]> removeOutliers2(List<Double[]> input) {
-    List<Double[]> output = new ArrayList<>();
+   public static List[] removeOutliers2(List[] input) {
+    List[] output = new List[3];
+    List<Double> temp0=new ArrayList<>();
+    List<Double> temp1=new ArrayList<>();
+    List<Double> temp2=new ArrayList<>();
+    output[0]=temp0;
+    output[1]=temp1;
+    output[2]=temp2;
     List<resR2> temp=new ArrayList<>();
-    Double[] init={Double.NaN,Double.NaN};
+    Double[] init={Double.NaN,Double.NaN, Double.NaN};
     resR2 tempResR2 = new resR2(init);
-    Double[] tempDouble= new Double[2];
-    for (int k=0; k<input.size(); k++){
-        tempResR2=tempResR2.createResR2(input.get(k));
+
+    for (int k=0; k<input[0].size(); k++){
+        tempResR2=tempResR2.createResR2((Double)input[0].get(k), (Double)input[1].get(k),(Double)input[2].get(k) );
         temp.add(tempResR2);
     }
-    if (input.size() > 4) {
+    if (input[0].size() > 4) {
       Comparator <resR2> resComparator = Comparator.comparingDouble(resR2::getRes);
       Collections.sort(temp,resComparator);
       List<resR2> data1 = new ArrayList<>();
@@ -177,9 +211,9 @@ public class dataTricks {
         double upperFence = q3 + 1.5D * iqr;
         for (int i = 0; i < temp.size(); i++) {
           if (((Double)temp.get(i).getRes()).doubleValue() > lowerFence && ((Double)temp.get(i).getRes()).doubleValue() < upperFence)
-              tempDouble[0]=temp.get(i).getRes();
-              tempDouble[1]=temp.get(i).getR2();
-          output.add(tempDouble); 
+              output[0].add(temp.get(i).getRes());
+              output[1].add(temp.get(i).getR2());
+              output[2].add(temp.get(i).getSBR());
         } 
       } else {
         output = input;
@@ -190,7 +224,7 @@ public class dataTricks {
     return output;
   }
   
-  private static double getMedian(List<Double> data) {
+  public static Double getMedian(List<Double> data) {
     if (data.isEmpty())
       return Double.NaN; 
     Collections.sort(data);
@@ -211,16 +245,45 @@ public class dataTricks {
     return mean;
   }
   
-  public static double getSD(List<Double> data) {
-    if (data.isEmpty() || data.size() < 4)
-      return Double.NaN; 
-    double sd = 0.0D;
+  public static Double getSD(List<Double> data) {
+    if (data.isEmpty() || data.size() < 4) return Double.NaN; 
+    double sumSquareDifferencetoMean = 0.0D;
     double mean = getMean(data).doubleValue();
-    for (int i = 0; i < data.size(); ) {
-      sd += Math.pow(((Double)data.get(i)).doubleValue() - mean, 2.0D);
-      i++;
+    //IJ.log("(in datatricks) mean "+mean);
+    for (int i = 0; i < data.size(); i++) {
+        //IJ.log("(in datatricks) value "+i+": "+data.get(i));
+        sumSquareDifferencetoMean += Math.pow(((Double)data.get(i)).doubleValue() - mean, 2.0D);
     } 
-    return Math.sqrt(sd / data.size());
+    double output=Math.sqrt(sumSquareDifferencetoMean/ data.size());
+    //IJ.log("(in datatricks)SD "+output);
+    return output;
+  }
+  
+   public static Double getMode(List<Double> data) {
+    if (data.isEmpty())  return Double.NaN; 
+    else {
+        Double mode = 0.0D;
+        Collections.sort(data);
+        double temp = 0.0D;
+        int count = 0;
+        int max=0;
+        List<Double> done=new ArrayList<>();
+    
+        for (int i = 0; i < data.size(); i++){
+            temp = data.get(i);
+            if (!data.contains(temp)){
+                count = 0;
+                for (int j = i + 1; j < data.size(); j++)if (temp == data.get(j)) count++;
+                if (count > max) {
+                    mode=temp;
+                    max = count;
+                }
+                else if(count == max) mode = Math.min(temp, mode);
+                done.add(temp);
+            }
+        }    
+        return mode;
+    }
   }
   
   public static Double getFailed(List<Double> data, double cutoff) {
@@ -244,23 +307,30 @@ public class dataTricks {
     List<Double> output = new ArrayList<>();
     if (data.isEmpty())
       return output; 
-    for (int i = 0; i < data.size(); ) {
-      if (!((Double)data.get(i)).isNaN())
-        output.add(data.get(i)); 
-      i++;
+    for (int i = 0; i < data.size(); i++) {
+      if (!((Double)data.get(i)).isNaN())output.add(data.get(i)); 
     } 
     return output;
   }
   
-    public static List<Double[]> purge2(List<Double[]> data) {
-    List<Double[]> output = new ArrayList<>();
-    if (data.isEmpty())
-      return output; 
-    for (int i = 0; i < data.size(); ) {
-      if (!((Double)data.get(i)[0]).isNaN())
-        output.add(data.get(i)); 
-      i++;
-    } 
+    public static List[] purge2(Double[][] data) {
+    List[] output = new List[3];
+    
+        List<Double> res = new ArrayList<>();
+        List<Double> r2 = new ArrayList<>();
+        List<Double> sbr = new ArrayList<>();
+        
+    for (int i = 0; i < data.length; i++) { 
+      if (!((Double)data[i][0]).isNaN()) {
+          res.add(data[i][0]);
+          r2.add(data[i][1]);
+          sbr.add(data[i][2]);
+      }
+    }
+    //for (int i = 0; i < res.size(); i++) IJ.log("(in datatricks purge2)output value "+i+": "+res.get(i)); 
+    output[0]=res;
+    output[1]=r2;
+    output[2]=sbr;
     return output;
   }
   
@@ -272,5 +342,12 @@ public class dataTricks {
     } 
     return output;
   }
-     
+ public static List<Double> getNonZero(float[][] array){
+    List<Double> output = new ArrayList<>();
+    for (int x=0; x<array.length; x++){
+        for (int y=0; y<array[0].length; y++) 
+            if (array[x][y]>0.0F) output.add((double) array[x][y]);
+    }
+    return output;
+ }
 }

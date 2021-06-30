@@ -11,6 +11,7 @@ import ij.plugin.filter.Analyzer;
 import ij.measure.*;
 import ij.plugin.ChannelSplitter;
 import ij.plugin.Colors;
+import metroloJ_QC.utilities.tricks.dataTricks;
 
 /**
  *
@@ -56,19 +57,20 @@ float[] floatStorage;
 ImageProcessor iproc;
 ImageProcessor [] colorProc;
 int insetPad;
+boolean [] temperatureChoice={false, false, false};
+
 
 public calBar(){
     
 }
 
-public ImagePlus createCalibratedImage(ImagePlus ip) {
+public ImagePlus createCalibratedImage(ImagePlus ip, boolean fixedScale) {
 iproc = ip.getProcessor().duplicate();
 imp = ip.duplicate();
 cal=ip.getCalibration();
 imp.setCalibration(cal);
-zoom=(imp.getWidth()/5)/BAR_LENGTH;
+zoom=(2*imp.getWidth()/5)/BAR_LENGTH;
 if (zoom<1) zoom=1.0D;
-iproc.snapshot();
 insetPad = imp.getWidth()/50;
 
 if (insetPad<4)insetPad = 4;
@@ -79,7 +81,7 @@ if (imp.getOverlay()!=null) {
 }
 ImagePlus originalRGBImage=imp.flatten();
 
-updateColorBar(imp, fire);
+updateColorBar(imp, fire, fixedScale);
 
 imp.deleteRoi();
 
@@ -105,71 +107,93 @@ ImagePlus output = new ImagePlus("Calibrated STDEV image", montage);
 return(output);
 }
 
-public ImagePlus createCalibratedTemperatureImage(ImagePlus ip) {
+public ImagePlus createCalibratedTemperatureImage(ImagePlus ip, boolean[] foundTemperaturePixels) {
+
     colorProc=new ImageProcessor[3];
     for (int i=0; i<3; i++) {
         ip.setC(i);
         colorProc[i] = ip.getProcessor().duplicate();
-        colorProc[i].snapshot();
     }
+    
     imp = ip.duplicate();
     cal=ip.getCalibration();
     imp.setCalibration(cal);
     ImagePlus originalRGBImage=imp.flatten();
     ImagePlus [] splitImp = ChannelSplitter.split(imp);
-    zoom=(imp.getWidth()/5)/BAR_LENGTH;
+    zoom=((2*imp.getWidth())/5)/BAR_LENGTH;
     if (zoom<1) zoom=1.0D;
     insetPad = imp.getWidth()/50;
     if (insetPad<4)insetPad = 4;
-    
     ImagePlus[] temperatureBar=new ImagePlus[3];
     for (int temperature=0; temperature<3; temperature++){
-        if (splitImp[temperature].getOverlay()!=null) {
-            splitImp[temperature].getOverlay().clear();
-            splitImp[temperature].getOverlay().setIsCalibrationBar(false);
-            splitImp[temperature].draw();
+        if (foundTemperaturePixels[temperature]){
+            if (splitImp[temperature].getOverlay()!=null) {
+                splitImp[temperature].getOverlay().clear();
+                splitImp[temperature].getOverlay().setIsCalibrationBar(false);
+                splitImp[temperature].draw();
+            }
+            LUT lut=LUT.createLutFromColor(Color.GRAY);
+            String barName="";
+            switch (temperature){
+                case 0 :
+                    lut=LUT.createLutFromColor(Color.GREEN);
+                    barName="G-Warm";
+                    break;
+                case 1 :
+                    lut=LUT.createLutFromColor(Color.BLUE);
+                    barName="B-Cold";
+                    break;
+                case 3 :
+                    lut=LUT.createLutFromColor(Color.RED);
+                    barName="R-Hot";
+                    break;
+            }
+            splitImp[temperature].setLut(lut);
+            updateColorBar(splitImp[temperature], temperature, false);
+            splitImp[temperature].deleteRoi();
+        
+            Overlay separatedOverlay = splitImp[temperature].getOverlay().duplicate();  
+            for (int n=separatedOverlay.size()-1; n>=0; n--) {
+                Roi roi = separatedOverlay.get(n);
+                if(roi.getName() == null || !roi.getName().equals(CALIBRATION_BAR))
+                separatedOverlay.remove(roi);
+   
+                Rectangle r = separatedOverlay.get(0).getBounds();
+                separatedOverlay.translate(-r.x, -r.y);
+                temperatureBar[temperature] = IJ.createImage("CBar", barName, r.width, r.height, 1);
+                temperatureBar[temperature].setOverlay(separatedOverlay);
+                temperatureBar[temperature] = temperatureBar[temperature].flatten();
+            }  
         }
-        imp.setC(temperature);
-        LUT temp=imp.getProcessor().getLut();
-        splitImp[temperature].getProcessor().setLut(temp);
-        updateColorBar(splitImp[temperature], temperature);
-        splitImp[temperature].deleteRoi();
-
-        Overlay separatedOverlay = splitImp[temperature].getOverlay().duplicate();   
-        for (int n=separatedOverlay.size()-1; n>=0; n--) {
-            Roi roi = separatedOverlay.get(n);
-            if(roi.getName() == null || !roi.getName().equals(CALIBRATION_BAR))
-            separatedOverlay.remove(roi);
-        }
-        Rectangle r = separatedOverlay.get(0).getBounds();
-        separatedOverlay.translate(-r.x, -r.y);
-        temperatureBar[temperature] = IJ.createImage("CBar", "RGB", r.width, r.height, 1);
-        temperatureBar[temperature].setOverlay(separatedOverlay);
-        temperatureBar[temperature] = temperatureBar[temperature].flatten();
+        else temperatureBar[temperature] = null;
+    }    
+    int montageWidth=originalRGBImage.getWidth();
+    for (int temperature=0; temperature<3; temperature++){
+        if (foundTemperaturePixels[temperature]) montageWidth+=10 + temperatureBar[temperature].getWidth();
     }
-    
-ImageProcessor montage = originalRGBImage.getProcessor().createProcessor(originalRGBImage.getWidth() + 10 + temperatureBar[0].getWidth()+10+temperatureBar[1].getWidth()+10+temperatureBar[2].getWidth(), originalRGBImage.getHeight());
-montage.setColor(Color.white);
-montage.fill();
-montage.insert(originalRGBImage.getProcessor(), 0, 0);
-int leftCorner=originalRGBImage.getProcessor().getWidth();
-for (int temperature=0; temperature<3; temperature++){
-    montage.insert(temperatureBar[temperature].getProcessor(), leftCorner + 10, 0);
-    leftCorner+=10+temperatureBar[temperature].getWidth();
+    ImageProcessor montage = originalRGBImage.getProcessor().createProcessor(montageWidth, originalRGBImage.getHeight());
+    montage.setColor(Color.white);
+    montage.fill();
+    montage.insert(originalRGBImage.getProcessor(), 0, 0);
+    int leftCorner=originalRGBImage.getProcessor().getWidth();
+    for (int temperature=0; temperature<3; temperature++){
+        if (foundTemperaturePixels[temperature]) {
+            montage.insert(temperatureBar[temperature].getProcessor(), leftCorner + 10, 0);
+            leftCorner+=10+temperatureBar[temperature].getWidth();
+        }
+    }
+    ImagePlus output = new ImagePlus("", montage);
+    return(output);
 }
-ImagePlus output = new ImagePlus("", montage);
 
-return(output);
-}
-
-private Overlay drawBarAsOverlay(ImagePlus ip, int x, int y, int temperature) {
+private Overlay drawBarAsOverlay(ImagePlus ip, int x, int y, int temperature, boolean fixedScale) {
     Overlay out=new Overlay();
-    Roi roi = imp.getRoi();
-    if (roi!=null)imp.deleteRoi();
-    stats = imp.getStatistics(Measurements.MIN_MAX, nBins);
+    Roi roi = ip.getRoi();
+    if (roi!=null)ip.deleteRoi();
+    stats = ip.getStatistics(Measurements.MIN_MAX, nBins);
     histogram = stats.histogram;
-    cal = imp.getCalibration();
-    int maxTextWidth = addText(null, ip, 0, 0);
+    cal = ip.getCalibration();
+    int maxTextWidth = addText(null, ip, 0, 0, fixedScale);
     windowWidth = (int)(XMARGIN*zoom) + 5 + (int)(BAR_THICKNESS*zoom) + maxTextWidth + (int)(XMARGIN/2*zoom);
 
     if (fillColor!=null) {
@@ -185,7 +209,7 @@ private Overlay drawBarAsOverlay(ImagePlus ip, int x, int y, int temperature) {
     x = (int)(XMARGIN*zoom) + xOffset;
     y = (int)(YMARGIN*zoom) + yOffset;
     addVerticalColorBar(out, ip.getProcessor(), x, y, (int)(BAR_THICKNESS*zoom), (int)(BAR_LENGTH*zoom), temperature);
-    addText(out, ip, x + (int)(BAR_THICKNESS*zoom), y);
+    addText(out, ip, x + (int)(BAR_THICKNESS*zoom), y, fixedScale);
         out.setIsCalibrationBar(true);
         if (ip.getCompositeMode()>0) {
             for (int i=0; i<out.size(); i++)
@@ -195,15 +219,14 @@ private Overlay drawBarAsOverlay(ImagePlus ip, int x, int y, int temperature) {
     }
 
 
-private void updateColorBar(ImagePlus ip, int temperature) {
-iproc.reset();
-calculateWidth(ip, temperature);
-imp.setOverlay(drawBarAsOverlay(imp, imp.getWidth()-insetPad-windowWidth, insetPad, temperature));
-this.imp.updateAndDraw();
+private void updateColorBar(ImagePlus ip, int temperature, boolean fixedScale) {
+calculateWidth(ip, temperature, fixedScale);
+ip.setOverlay(drawBarAsOverlay(ip, ip.getWidth()-insetPad-windowWidth, insetPad, temperature, fixedScale));
+ip.updateAndDraw();
 }
 
-void calculateWidth(ImagePlus ip, int temperature) {
-    Overlay temp=drawBarAsOverlay(ip, 0, 0, temperature);
+void calculateWidth(ImagePlus ip, int temperature, boolean fixedScale) {
+    Overlay temp=drawBarAsOverlay(ip, 0, 0, temperature, fixedScale);
     }
 
 public void addVerticalColorBar(Overlay overlay, ImageProcessor proc, int x, int y, int thickness, int length,int temperature) {
@@ -315,15 +338,6 @@ public void addVerticalColorBar(Overlay overlay, ImageProcessor proc, int x, int
 
     double colorRange =  mapSize;
     int start = 0;
-    if (proc instanceof ByteProcessor) {
-        //IJ.log("(in calBar) was a ByteProcessor");
-            int min = (int)iproc.getMin();
-            if (min<0) min = 0;
-            int max = (int)iproc.getMax();
-            if (max>255) max = 255;
-            colorRange = max-min+1;
-            start = min;
-        }
     for (int i = 0; i<(int)(BAR_LENGTH*zoom); i++) {
         int iMap = start + (int)Math.round((i*colorRange)/(BAR_LENGTH*zoom));
             if (iMap>=mapSize)iMap =mapSize - 1;
@@ -341,10 +355,19 @@ public void addVerticalColorBar(Overlay overlay, ImageProcessor proc, int x, int
         }
     }
 
-    private int addText(Overlay overlay, ImagePlus ip, int x, int y) {
+    private int addText(Overlay overlay, ImagePlus ip, int x, int y, boolean fixedScale) {
         if (textColor == null)return 0;
-        double hmin = ip.getCalibration().getCValue(stats.histMin);
-        double hmax = ip.getCalibration().getCValue(stats.histMax);
+        double hmin;
+        double hmax;
+        if (fixedScale){
+            hmin=0.0D;
+            hmax=6.0D;
+        }
+        else {
+            ImageStatistics is=ip.getStatistics(Measurements.MIN_MAX);
+            hmin=ip.getCalibration().getCValue(is.min);
+            hmax=ip.getCalibration().getCValue(is.max);
+        }
         double barStep = (double)(BAR_LENGTH*zoom) ;
         if (numLabels > 2)
             barStep /= (numLabels - 1);
@@ -362,8 +385,8 @@ public void addVerticalColorBar(Overlay overlay, ImageProcessor proc, int x, int
             double yLabelD = (int)(YMARGIN*zoom+ BAR_LENGTH*zoom - i*barStep - 1);
             int yLabel = (int)(Math.round( y + BAR_LENGTH*zoom - i*barStep - 1));
             String s = cal.getValueUnit();
-            double min = iproc.getMin();
-            double max = iproc.getMax();
+            double min = ip.getProcessor().getMin();
+            double max = ip.getProcessor().getMax();
             if (ip.getProcessor() instanceof ByteProcessor) {
                 //IJ.log("(in calBar) Was a byteprocessor");
                 if (min<0) min = 0;
@@ -373,7 +396,7 @@ public void addVerticalColorBar(Overlay overlay, ImageProcessor proc, int x, int
             grayLabel = ip.getCalibration().getCValue(grayLabel);
             double cmin = ip.getCalibration().getCValue(min);
             double cmax = ip.getCalibration().getCValue(max);
-            String todisplay = d2s(grayLabel)+" "+s;
+            String todisplay = d2s(dataTricks.round(grayLabel,1))+" "+s;
             if (overlay!=null) {
                 TextRoi label = new TextRoi(todisplay, x + 5, yLabel + fontHeight/2, font);             
                 label.setStrokeColor(textColor);

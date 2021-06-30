@@ -22,6 +22,7 @@ import metroloJ_QC.utilities.doCheck;
 import metroloJ_QC.utilities.findMax;
 import metroloJ_QC.utilities.tricks.dataTricks;
 import metroloJ_QC.utilities.tricks.fileTricks;
+import metroloJ_QC.setup.metroloJDialog;
 
 public class PSFprofiler {
   public static final double SQRT2LN2 = Math.sqrt(2.0D * Math.log(2.0D));
@@ -76,7 +77,9 @@ public class PSFprofiler {
   
   public boolean result = false;
   
-  public PSFprofiler(ImagePlus image, microscope conditions, boolean saturationChoice, String originalImageName) {
+  public double[] anulusThickness;
+  
+  public PSFprofiler(ImagePlus image, microscope conditions, metroloJDialog mjd, String originalImageName, String creationDate) {
     this.result = false;
     this.micro = conditions;
     if ((image.getCalibration()).pixelDepth != conditions.cal.pixelDepth || (image.getCalibration()).pixelHeight != conditions.cal.pixelHeight || (image.getCalibration()).pixelWidth != conditions.cal.pixelWidth) {
@@ -93,16 +96,19 @@ public class PSFprofiler {
     initializeValues();
     int i;
     for (i = 0; i < this.ip.length; i++) {
-      double[] temp = doCheck.computeRatios(this.ip[i], this.micro.bitDepth);
+      if (mjd.debugMode)IJ.log("(in PSFProfiler) image name: "+image.getShortTitle());
+      double[] temp = doCheck.computeRatios(this.ip[i], mjd);
       this.saturation[i] = temp[0];
       this.SBRatio[i] = temp[1];
+      this.anulusThickness[i]=temp[2];
+      if (mjd.debugMode)IJ.log("(in PSFProfiler) anulusThickness channel "+i+": "+anulusThickness[i]);
     } 
-    this.result = doCheck.validChannelFound(saturationChoice, this.saturation);
+    this.result = doCheck.validChannelFound(mjd.saturationChoice, this.saturation);
     if (this.result) {
-      this.micro.getSpecs(name, this.saturation);
+      this.micro.getSpecs(name, this.saturation, creationDate);
       this.microSection = this.micro.reportHeader;
       for (i = 0; i < this.ip.length; i++) {
-        if (saturationChoice && this.saturation[i] > 0.0D) {
+        if (mjd.saturationChoice && this.saturation[i] > 0.0D) {
           for (int dim = 0; dim < 3; dim++) {
             this.centers[i][dim] = Double.NaN;
             this.resol[i][dim] = Double.NaN;
@@ -138,8 +144,8 @@ public class PSFprofiler {
     } 
   }
   
-  public PSFprofiler(String path, microscope conditions, boolean Choice, String originalName) {
-    this(new ImagePlus(path), conditions, Choice, originalName);
+  public PSFprofiler(String path, microscope conditions, metroloJDialog mjd, String originalName, String creationDate) {
+    this(new ImagePlus(path), conditions, mjd, originalName, creationDate);
   }
   
   private void getXprofileAndFit(int i) {
@@ -495,6 +501,7 @@ public class PSFprofiler {
     } 
    saturation = new double[ip.length];
    SBRatio = new double[ip.length];
+   anulusThickness=new double[ip.length];
    resol = temp;
    xR2 = temp2X;
    yR2 = temp2Y;

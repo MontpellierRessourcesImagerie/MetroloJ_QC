@@ -9,6 +9,7 @@ import ij.ImagePlus;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import metroloJ_QC.importer.simpleMetaData;
 import metroloJ_QC.fieldIllumination.fieldIllumination;
 import metroloJ_QC.report.utilities.ReportSections;
 import metroloJ_QC.report.utilities.content;
@@ -17,6 +18,8 @@ import metroloJ_QC.setup.microscope;
 
 public class fieldIlluminationReport {
   microscope micro;
+  
+  String creationDate="";
   
   ReportSections rs = new ReportSections();
   
@@ -34,13 +37,18 @@ public class fieldIlluminationReport {
   
   boolean thresholdChoice;
   
-  public fieldIlluminationReport(ImagePlus ip, microscope micro, boolean gaussianBlurChoice, double stepWidth, boolean thresholdChoice, boolean saturationChoice, String title, boolean wavelengthChoice) {
+  private boolean debugMode;
+  
+  public fieldIlluminationReport(ImagePlus ip, microscope micro, boolean gaussianBlurChoice, double stepWidth, boolean thresholdChoice, boolean saturationChoice, String title, boolean wavelengthChoice, boolean debugMode, String creationDate) {
+    this.creationDate=creationDate;
     this.micro = micro;
+    this.debugMode=debugMode;
     this.gaussianBlurChoice = gaussianBlurChoice;
     this.stepWidth = stepWidth;
     this.thresholdChoice = thresholdChoice;
-    this.fi = new fieldIllumination(ip, micro, gaussianBlurChoice, stepWidth, thresholdChoice, saturationChoice, wavelengthChoice);
-    this.title = micro.date + "\nField Illumination report\n" + title;
+    this.fi = new fieldIllumination(ip, micro, gaussianBlurChoice, stepWidth, thresholdChoice, saturationChoice, wavelengthChoice, this.creationDate);
+    this.title = title;
+    
   }
   
   public void saveReport(String path, metroloJDialog mjd, double uniformityTolerance, double centAccTolerance, double stepWidth, boolean gaussianBlurChoice) {
@@ -53,13 +61,13 @@ public class fieldIlluminationReport {
         PdfWriter writer = PdfWriter.getInstance(report, new FileOutputStream(path));
         report.open();
         writer.setStrictImageSequence(true);
-        report.add((Element)this.rs.logoRTMFM());
+        report.add((Element)this.rs.logo("fi.png", 100.0F, debugMode));
         if (mjd.shorten) {
           report.add((Element)this.rs.bigTitle(this.title + " (SHORT)"));
         } else {
           report.add((Element)this.rs.bigTitle(this.title));
         } 
-        String sectionTitle = "Microscope infos:";
+        String sectionTitle = "Microscope info:";
         String text = "";
         content[][] summary = this.fi.microSection;
         PdfPTable table = this.rs.table(summary, 65.0F, true);
@@ -81,7 +89,7 @@ public class fieldIlluminationReport {
           text = text + " The centering accuracy is computed using the maximum intensity pixel. ";
         } 
         report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, null, text));
-        sectionTitle = "Main Field Illumination parameters:";
+        sectionTitle = "Uniformity & Centering Accuracy:";
         text = "";
         table = this.rs.table(this.fi.getSummaryTableForReport(uniformityTolerance, centAccTolerance), 90.0F, mjd.useTolerance);
         if (mjd.useTolerance)
@@ -121,14 +129,14 @@ public class fieldIlluminationReport {
         } 
         report.newPage();
         if (!this.micro.sampleInfos.equals("")) {
-          report.add((Element)this.rs.title("Sample infos:"));
+          report.add((Element)this.rs.title("Sample info:"));
           report.add((Element)this.rs.paragraph(this.micro.sampleInfos));
         } 
         if (!this.micro.comments.equals("")) {
           report.add((Element)this.rs.title("Comments:"));
           report.add((Element)this.rs.paragraph(this.micro.comments));
         } 
-        mjd.compileDialogHeader(path.substring(0, path.lastIndexOf(".pdf")));
+        mjd.compileDialogHeader(path);
         if (mjd.useTolerance) {
           rows = mjd.dialogHeader.length + 5;
         } else {
@@ -172,6 +180,12 @@ public class fieldIlluminationReport {
         columnWidths = new float[] { 10.0F, 15.0F, 35.0F };
         table.setWidths(columnWidths);
         report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, table, text));
+        report.newPage();
+        sectionTitle = "Formulas used:";
+        text = "";
+        report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, null, text));
+        report.add((Element)this.rs.logo("FI_formulas.png", 90.0F, debugMode));
+        
         report.close();
       } catch (FileNotFoundException|com.itextpdf.text.DocumentException ex) {
         IJ.error("Error occured while generating/saving the report");

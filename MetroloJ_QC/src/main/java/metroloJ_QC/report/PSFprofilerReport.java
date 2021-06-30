@@ -20,28 +20,33 @@ import metroloJ_QC.utilities.sideViewGenerator;
 public class PSFprofilerReport {
   microscope micro;
   
+  String creationDate="";
+  
   ReportSections rs = new ReportSections();
   
   public PSFprofiler pp;
   
   sideViewGenerator[] svg;
   
+  boolean debugMode;
+  
   String title = "";
   
-  public PSFprofilerReport(ImagePlus ip, microscope microscope1, String title, boolean saturationChoice, String originalImageName, boolean sqrtChoice) {
-    this.micro = microscope1;
-    this.title = this.micro.date + "\nPSF Profiler report";
-    if (!title.equals(""))
-      this.title += "\n" + title; 
-    this.pp = new PSFprofiler(ip, this.micro, saturationChoice, originalImageName);
+  public PSFprofilerReport(ImagePlus ip, microscope microscope, String title, metroloJDialog mjd, String originalImageName, boolean sqrtChoice, String creationDate, boolean debugMode) {
+    this.creationDate=creationDate;
+    this.micro = microscope;
+    this.title = title; 
+    this.debugMode=debugMode;
+    this.pp = new PSFprofiler(ip, this.micro, mjd, originalImageName, this.creationDate);
     this.svg = new sideViewGenerator[this.pp.ip.length];
     for (int i = 0; i < this.pp.ip.length; ) {
       this.svg[i] = new sideViewGenerator(this.pp.ip[i], sqrtChoice);
       i++;
     } 
+    
   }
   
-  public void saveReport(String path, metroloJDialog mjd, double XYratioTolerance, double ZratioTolerance, boolean sqrtChoice) {
+  public void saveReport(ImagePlus ip, String path, metroloJDialog mjd, double XYratioTolerance, double ZratioTolerance, boolean sqrtChoice) {
     try {
       ImagePlus[] img = new ImagePlus[this.pp.ip.length];
       for (int i = 0; i < img.length; ) {
@@ -54,13 +59,13 @@ public class PSFprofilerReport {
         PdfWriter writer = PdfWriter.getInstance(report, new FileOutputStream(path));
         report.open();
         writer.setStrictImageSequence(true);
-        report.add((Element)this.rs.logoRTMFM());
+        report.add((Element)this.rs.logo("pp.png", 100.0F, debugMode));
         if (mjd.shorten) {
           report.add((Element)this.rs.bigTitle(this.title + " (SHORT)"));
         } else {
           report.add((Element)this.rs.bigTitle(this.title));
         } 
-        String sectionTitle = "Microscope infos:";
+        String sectionTitle = "Microscope info:";
         String text = "";
         content[][] summary = this.pp.microSection;
         PdfPTable table = this.rs.table(summary, 95.0F, true);
@@ -73,7 +78,7 @@ public class PSFprofilerReport {
         text = text + " " + warnings.beadSizeWarnings(mjd.beadSize, this.pp.micro, 0);
         report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, null, text));
         sectionTitle = "Resolution table:";
-        text = "";
+        text = warnings.anulusSizeWarnings(mjd, this.pp);
         content[][] summary1 = this.pp.getResolutionSummary(XYratioTolerance, ZratioTolerance, mjd.saturationChoice);
         table = this.rs.table(summary1, 90.0F, mjd.useTolerance);
         columnWidths = new float[] { 20.0F, 10.0F, 10.0F, 10.0F, 10.0F, 10.0F, 10.0F };
@@ -89,8 +94,8 @@ public class PSFprofilerReport {
         report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, table, text));
         for (int j = 0; j < this.pp.ip.length; j++) {
           report.newPage();
-          if (j == 0)
-            report.add((Element)this.rs.title("Detailed channel detection infos:")); 
+          if (j == 0) report.add((Element)this.rs.title("Detailed channel detection info:")); 
+          report.add((Element)this.rs.title2("Channel #"+j)); 
           sectionTitle = "";
           text = "";
           img[j] = this.svg[j].getPanelView(1, true, true, mjd.scale, false, null, 0);
@@ -122,14 +127,16 @@ public class PSFprofilerReport {
         } 
         report.newPage();
         if (!this.micro.sampleInfos.equals("")) {
-          report.add((Element)this.rs.title("Sample infos:"));
+          report.add((Element)this.rs.title("Sample info:"));
           report.add((Element)this.rs.paragraph(this.micro.sampleInfos));
         } 
         if (!this.micro.comments.equals("")) {
           report.add((Element)this.rs.title("Comments:"));
           report.add((Element)this.rs.paragraph(this.micro.comments));
         } 
-        mjd.compileDialogHeader(path.substring(0, path.lastIndexOf(".pdf")));
+        mjd.computeFinalAnulusThickness(pp.anulusThickness);
+        if (mjd.debugMode)IJ.log("(in PSFProfilerReport>saveReport) finalAnulusThickness: "+mjd.finalAnulusThickness);
+        mjd.compileDialogHeader(path);
         if (mjd.useTolerance) {
           rows = mjd.dialogHeader.length + 4;
         } else {
@@ -146,15 +153,17 @@ public class PSFprofilerReport {
         } 
         header[mjd.dialogHeader.length][0] = new content("Square Root PSF Image displayed", 6, 1, 2);
         header[mjd.dialogHeader.length][1] = new content();
-        header[mjd.dialogHeader.length][2] = new content("" + sqrtChoice, 5);
-        header[mjd.dialogHeader.length + 1][0] = new content("Tolerance", 6, rows - mjd.dialogHeader.length + 1, 1);
-        if (mjd.useTolerance)
-          for (row = mjd.dialogHeader.length + 2; row < header.length; ) {
-            header[row][0] = new content();
-            row++;
-          }  
+        header[mjd.dialogHeader.length][2] = new content("" + sqrtChoice, 5); 
+        if (mjd.useTolerance) {
+            header[mjd.dialogHeader.length + 1][0] = new content("Tolerance", 6, 3, 1);
+            for (row = mjd.dialogHeader.length + 2; row < mjd.dialogHeader.length + 4; row++ ) header[row][0] = new content();
+            } 
+        else {
+            header[mjd.dialogHeader.length + 1][0] = new content("Tolerance", 6, 1, 1);
+        }
         header[mjd.dialogHeader.length + 1][1] = new content("applied in this report", 6);
         header[mjd.dialogHeader.length + 1][2] = new content("" + mjd.useTolerance, 5);
+
         if (mjd.useTolerance) {
           header[mjd.dialogHeader.length + 2][1] = new content("X & Y FWHM ratios valid if below", 0);
           header[mjd.dialogHeader.length + 2][2] = new content("" + XYratioTolerance, 5);
@@ -167,6 +176,27 @@ public class PSFprofilerReport {
         columnWidths = new float[] { 10.0F, 15.0F, 35.0F };
         table.setWidths(columnWidths);
         report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, table, text));
+        report.newPage();
+        sectionTitle = "Formulas used:";
+        text = "";
+        String temp="PP_";
+        switch (mjd.microtype){
+            case microscope.WIDEFIELD: 
+                temp+="WIDEFIELD";
+                break;
+            case microscope.CONFOCAL: 
+                temp+="CONFOCAL";
+                break;
+            case microscope.SPINNING: 
+                temp+="SPINNING";
+                break;
+            case microscope.MULTIPHOTON: 
+                temp+="MULTIPHOTON";
+                break;
+        }
+        temp+="_formulas.png";
+        report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, null, text));
+        report.add((Element)this.rs.logo(temp, 90.0F, debugMode));
         report.close();
       } 
       if ((mjd.saveImages | mjd.saveSpreadsheet) != false) {

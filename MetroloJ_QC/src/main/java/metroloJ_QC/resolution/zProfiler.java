@@ -51,7 +51,7 @@ public class zProfiler {
   
   public double[] saturation;
   
-  public zProfiler(ImagePlus image, Roi roi, microscope conditions, int fitChoice) {
+  public zProfiler(ImagePlus image, Roi roi, microscope conditions, int fitChoice, String creationDate) {
     this.roi = roi;
     this.micro = conditions;
     if ((image.getCalibration()).pixelDepth != conditions.cal.pixelDepth || (image.getCalibration()).pixelHeight != conditions.cal.pixelHeight || (image.getCalibration()).pixelWidth != conditions.cal.pixelWidth) {
@@ -68,7 +68,7 @@ public class zProfiler {
       this.saturation[i] = doCheck.computeSaturationRatio(this.ip[i], false, this.micro.bitDepth);
       i++;
     } 
-    this.micro.getSpecs(name, this.saturation);
+    this.micro.getSpecs(name, this.saturation, creationDate);
     this.microSection = this.micro.reportHeader;
     for (i = 0; i < this.ip.length; i++) {
       double[] temp = (new proj2D()).doProj(this.ip[i], roi);

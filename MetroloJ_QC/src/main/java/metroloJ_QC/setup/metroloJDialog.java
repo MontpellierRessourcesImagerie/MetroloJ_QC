@@ -6,10 +6,21 @@ import ij.Prefs;
 import ij.WindowManager;
 import ij.gui.GenericDialog;
 import ij.measure.Calibration;
+import java.text.DateFormat;
+import java.util.Calendar;
 import metroloJ_QC.report.utilities.content;
 import metroloJ_QC.utilities.tricks.dataTricks;
+import metroloJ_QC.utilities.tricks.fileTricks;
 
 public class metroloJDialog extends GenericDialog {
+  public static final String VERSION = "1.1.3"; 
+  
+  public boolean debugMode=Prefs.get("MetroloJ_debugMode.Boolean", false);
+  
+  public String operator=Prefs.get("MetroloJ_operator.String", "");
+  
+  public String reportName="";
+  
   public ImagePlus ip = null;
   
   public int microtype = (int)Prefs.get("MetroloJ_micro.double", 0.0D);
@@ -88,6 +99,12 @@ public class metroloJDialog extends GenericDialog {
   
   public int bitDepth = (int)Prefs.get("MetroloJ_bitDepth.double", 16.0D);
   
+  public double anulusThickness;
+  
+  public String finalAnulusThickness="";
+  
+  public boolean useBeads=false;
+  
   public metroloJDialog(String title) {
     super(title);
     this.ip = WindowManager.getCurrentImage();
@@ -98,6 +115,9 @@ public class metroloJDialog extends GenericDialog {
     this.channels = new String[this.ip.getNChannels()];
   }
   
+  public void addOperator() {
+    addStringField("Operator's name", Prefs.get("MetroloJ_operator.String", ""), 10);
+  }
   public void addBitDepth() {
     addNumericField("Actual image bit depth", this.bitDepth, 0);
   }
@@ -110,8 +130,8 @@ public class metroloJDialog extends GenericDialog {
     addChoice("Detector type", detector.TYPE, detector.TYPE[this.detectortype]);
   }
   
-  public void addDimensionOrder(ImagePlus ip) {
-    if (ip.isStack() && ip.getNSlices() > 1)
+  public void addDimensionOrder(ImagePlus image) {
+    if (image.isStack() && image.getNSlices() > 1)
       if (Prefs.get("MetroloJ_dimension.double", 0.0D) > 3.0D) {
         addChoice("File order", microscope.DIMENSION_ORDER, "XYZ");
       } else {
@@ -119,41 +139,41 @@ public class metroloJDialog extends GenericDialog {
       }  
   }
   
-  public void addDimensionOrderPlus(ImagePlus ip) {
-    if (ip.isStack() && ip.getNSlices() > 1)
+  public void addDimensionOrderPlus(ImagePlus image) {
+    if (image.isStack() && image.getNSlices() > 1)
       addChoice("File order", detector.DIMENSION_ORDER, detector.DIMENSION_ORDER[this.dimensionOrder]); 
   }
   
-  public void addWavelengths(ImagePlus ip) {
-    if (ip.getNChannels() > this.emWavelengthsList.length)
+  public void addWavelengths(ImagePlus image) {
+    if (image.getNChannels() > this.emWavelengthsList.length)
       throw new IllegalArgumentException("the image contains more than the maximum of " + this.emWavelengthsList.length + " channels"); 
-    addMessage("found " + ip.getNChannels() + " channel(s), " + ip.getNSlices() + " slice(s) & " + ip.getNFrames() + " frame(s).");
+    addMessage("found " + image.getNChannels() + " channel(s), " + image.getNSlices() + " slice(s) & " + image.getNFrames() + " frame(s).");
     addToSameRow();
     addMessage("For confocal images only :");
-    for (int i = 0; i < ip.getNChannels(); i++) {
+    for (int i = 0; i < image.getNChannels(); i++) {
       addNumericField("  Em. Wavelength " + i + " (nm)", this.emWavelengthsList[i], 1);
       addToSameRow();
       addNumericField("    Ex. Wavelength " + i + " (nm)", this.exWavelengthsList[i], 1);
     } 
   }
   
-  public void addChannelsPMT(ImagePlus ip) {
-    if (ip.getNChannels() > this.PMTsList.length)
+  public void addChannelsPMT(ImagePlus image) {
+    if (image.getNChannels() > this.PMTsList.length)
       throw new IllegalArgumentException("the image contains more than the maximum of " + this.PMTsList.length + " channels"); 
-    addMessage("found " + ip.getNChannels() + " channel(s), " + ip.getNSlices() + " slice(s) & " + ip.getNFrames() + " frame(s).");
-    if (ip.getNChannels() > 1)
-      for (int i = 0; i < ip.getNChannels(); ) {
+    addMessage("found " + image.getNChannels() + " channel(s), " + image.getNSlices() + " slice(s) & " + image.getNFrames() + " frame(s).");
+    if (image.getNChannels() > 1)
+      for (int i = 0; i < image.getNChannels(); ) {
         addStringField(" Detector/channel " + i, this.PMTsList[i]);
         i++;
       }  
   }
   
-  public void addChannelsCameras(ImagePlus ip) {
-    if (ip.getNChannels() > this.camerasList.length)
+  public void addChannelsCameras(ImagePlus image) {
+    if (image.getNChannels() > this.camerasList.length)
       throw new IllegalArgumentException("the image contains more than the maximum of " + this.camerasList.length + " channels"); 
-    addMessage("found " + ip.getNChannels() + " channel(s), " + ip.getNSlices() + " slice(s) & " + ip.getNFrames() + " frame(s).");
-    if (ip.getNChannels() > 1)
-      for (int i = 0; i < ip.getNChannels(); ) {
+    addMessage("found " + image.getNChannels() + " channel(s), " + image.getNSlices() + " slice(s) & " + image.getNFrames() + " frame(s).");
+    if (image.getNChannels() > 1)
+      for (int i = 0; i < image.getNChannels(); ) {
         addStringField(" Camera/channel " + i, this.camerasList[i]);
         i++;
       }  
@@ -170,7 +190,7 @@ public class metroloJDialog extends GenericDialog {
   }
   
   public void addInfos() {
-    addTextAreas("Sample infos:\n" + this.sampleInfos, "Comments:\n" + this.comments, 3, 30);
+    addTextAreas("Add here other useful sample information to trace\n" + this.sampleInfos, "Add here any comments\n" + this.comments, 3, 30);
   }
   
   public void addScale() {
@@ -181,16 +201,19 @@ public class metroloJDialog extends GenericDialog {
     addCheckbox("Discard saturated samples", Prefs.get("MetroloJ_saturation.boolean", false));
   }
   
-  public void addMultipleBeads() {
+  public void addMultipleBeads(ImagePlus image) {
     addCheckbox("Images contain more than one bead", Prefs.get("MetroloJ_multipleBeads.boolean", false));
-    addToSameRow();
-    addNumericField("Find beads with channel #", (int)Prefs.get("MetroloJ_beadChannel.double", 0.0D), 0);
-    addNumericField("Bead size in ", Prefs.get("MetroloJ_beadSize.double", 4.0D), 2);
+    if (image.getNChannels() > 1) {
+        addToSameRow();
+        addNumericField("Find beads with channel # (!first channel is 0)", (int)Prefs.get("MetroloJ_beadChannel.double", 0.0D), 0);
+    }
+    addNumericField("Bead size in "+IJ.micronSymbol+"m", Prefs.get("MetroloJ_beadSize.double", 4.0D), 2);
     addToSameRow();
     addNumericField("Crop a x times bigger field", Prefs.get("MetroloJ_cropFactor.double", 5.0D), 0);
+    addNumericField("Compute background on a ", (int)Prefs.get("MetroloJ_beadAnulus.double", 1.0D), 0,3,""+IJ.micronSymbol+"m anulus around beads");
     Calibration cal=ip.getCalibration();
     addMessage("Opened Z stack size "+dataTricks.round((ip.getNSlices()-1)*cal.pixelDepth,2)+" "+cal.getUnit());
-    addNumericField("Reject beads less than ", Prefs.get("MetroloJ_beadCenteringDistance.double", 5.0D), 0,3," um from the top/bottom of the stack");
+    addNumericField("Reject beads less than ", Prefs.get("MetroloJ_beadCenteringDistance.double", 2.0D), 0,3," um from the top/bottom of the stack");
   }
   
   public void addSaveChoices(String text) {
@@ -235,7 +258,9 @@ public class metroloJDialog extends GenericDialog {
     addMessage("Plugin parameters");
     addRemoveSaturated();
   }
-  
+    public void addDebugMode() {
+    addCheckbox("Show logs", this.debugMode);
+  }
   public void getAllMicroscope(ImagePlus ip, boolean dimensionChoice) {
     this.bitDepth = (int)getNextNumber();
     this.microtype = getNextChoiceIndex();
@@ -250,9 +275,9 @@ public class metroloJDialog extends GenericDialog {
     this.pinhole = getNextNumber();
     this.refractiveIndex = getNextNumber();
     this.sampleInfos = getNextText();
-    this.sampleInfos = this.sampleInfos.replace("Sample infos:\n", "");
+    this.sampleInfos = this.sampleInfos.replace("Add here other useful sample information to trace\n", "");
     this.comments = getNextText();
-    this.comments = this.comments.replace("Comments:\n", "");
+    this.comments = this.comments.replace("Add here any comments\n", "");
     this.scale = (int)getNextNumber();
     this.saturationChoice = getNextBoolean();
   }
@@ -301,17 +326,19 @@ public class metroloJDialog extends GenericDialog {
       this.channels[0] = "";
     } 
     this.sampleInfos = getNextText();
-    this.sampleInfos = this.sampleInfos.replace("Sample infos:\n", "");
+    this.sampleInfos = this.sampleInfos.replace("Add here other useful sample information to trace\n", "");
     this.comments = getNextText();
-    this.comments = this.comments.replace("Comments:\n", "");
+    this.comments = this.comments.replace("Add here any comments\n", "");
     this.saturationChoice = getNextBoolean();
   }
   
-  public void getMutlipleBeads() {
+  public void getMutlipleBeads(ImagePlus image) {
     this.multipleBeads = getNextBoolean();
-    this.beadChannel = (int)getNextNumber();
+    if (image.getNChannels() > 1) this.beadChannel = (int)getNextNumber();
+    else this.beadChannel=0;
     this.beadSize = getNextNumber();
     this.cropFactor = getNextNumber();
+    this.anulusThickness=getNextNumber();
     this.beadMinDistanceToTopBottom=getNextNumber();
   }
   
@@ -330,9 +357,12 @@ public class metroloJDialog extends GenericDialog {
   public void getUseTolerance() {
     this.useTolerance = getNextBoolean();
   }
-  
+  public void getDebugMode() {
+    this.debugMode = getNextBoolean();
+  }
   public microscope getMicroscope() {
     return getMicroscope(this.ip.getCalibration());
+//    if (this.debugMode)logMicroscope();
   }
   
   public microscope getMicroscope(Calibration cal) {
@@ -355,15 +385,25 @@ public class metroloJDialog extends GenericDialog {
     return new detector(this.detectortype, this.dimensionOrder, this.channels, Double.valueOf(Double.NaN), this.sampleInfos, this.comments, this.bitDepth);
   }
   
+  public void getOperator() {
+    this.operator=getNextString();
+  }
+  
+   public void getReportName(String name) {
+    this.reportName=name;
+  }
+  
   public void saveMultipleBeadsPrefs() {
     Prefs.set("MetroloJ_multipleBeads.boolean", this.multipleBeads);
     Prefs.set("MetroloJ_beadChannel.double", this.beadChannel);
     Prefs.set("MetroloJ_beadSize.double", this.beadSize);
     Prefs.set("MetroloJ_cropFactor.double", this.cropFactor);
+    Prefs.set("MetroloJ_beadAnulus.double", this.anulusThickness);
     Prefs.set("MetroloJ_beadCenteringDistance.double", this.beadMinDistanceToTopBottom);
   }
   
   public void savePrefs() {
+    Prefs.set("MetroloJ_operator.String", this.operator);
     Prefs.set("MetroloJ_bitDepth.double", this.bitDepth);
     Prefs.set("MetroloJ_micro.double", this.microtype);
     Prefs.get("MetroloJ_detector.double", this.detectortype);
@@ -382,6 +422,8 @@ public class metroloJDialog extends GenericDialog {
     Prefs.set("MetroloJ_comments.string", this.comments);
     Prefs.set("MetroloJ_scale.double", this.scale);
     Prefs.set("MetroloJ_saturation.boolean", this.saturationChoice);
+    Prefs.set("MetroloJ_debugMode.boolean", this.debugMode);
+    
   }
   
   public void saveSavePrefs() {
@@ -399,20 +441,51 @@ public class metroloJDialog extends GenericDialog {
   public void saveUseTolerancePrefs() {
     Prefs.set("MetroloJ_useTolerance.boolean", this.useTolerance);
   }
+  public void computeFinalAnulusThickness(double[] thicknessValues){
+      String temp="";
+      boolean sameThickness=true;
+      if (debugMode)IJ.log("(in MetroloJDialog>computeFinalAnulusThickness) anulusThickness channel 0:" +thicknessValues[0]);
+      for (int i=1; i<thicknessValues.length; i++){
+          if (debugMode)IJ.log("(in MetroloJDialog>computeFinalAnulusThickness) anulusThickness channel "+i+": "+thicknessValues[i]);
+          if (thicknessValues[i]!=thicknessValues[0])sameThickness=false;
+        }
+      if (sameThickness=false){
+          for (int i=0; i<thicknessValues.length; i++) temp+=dataTricks.round(thicknessValues[i],2)+" (channel "+i+") ";
+      }
+      else temp=+dataTricks.round(thicknessValues[0],2)+" (all channels)";
+    if (debugMode)IJ.log("(in MetroloJDialog>computeFinalAnulusThickness) output before return: " +temp);  
+   finalAnulusThickness=temp;   
+  }
   
   public void compileDialogHeader(String reportFolder) {
-    int rows, cols = 3;
-    if (this.multipleBeads) {
-      rows = 10;
-    } else {
-      rows = 6;
-    } 
+    if (debugMode)IJ.log("(in MetroloJDialog>compileDialogHeader) finalAnulusThickness at begining "+finalAnulusThickness);
+    if (reportFolder.endsWith(".pdf")) reportFolder=fileTricks.cropExtension(reportFolder);
+    int cols = 3;
+    int rows=8;
+    if (useBeads){
+        rows+=2;
+        if (multipleBeads)rows+=4;
+    }
+
     content[][] temp = new content[rows][cols];
-    temp[0][0] = new content("data", 6, 3, 1);
+    temp[0][0] = new content("Tool & Operator", 6, 3, 1);
     temp[1][0] = new content();
     temp[2][0] = new content();
-    temp[0][1] = new content("result folder", 6);
-    temp[0][2] = new content(reportFolder, 5);
+    temp[0][1] = new content("Tool", 6);
+    temp[0][2]= new content(this.reportName,5);
+    temp[1][1] = new content("Versions", 6);
+    String version="MetroloJ_QC v"+VERSION+", ImageJ v"+IJ.getVersion()+", Java v"+System.getProperty("java.version")+", OS "+System.getProperty("os.name");
+    temp[1][2]= new content(version,5);
+    DateFormat df = DateFormat.getDateTimeInstance(1, 3);
+    String operatorAndDate=this.operator+", "+df.format(Calendar.getInstance().getTime()).toString();
+    temp[2][1] = new content("Operator & date", 6);
+    temp[2][2] = new content(operatorAndDate, 5);
+    
+    temp[3][0] = new content("data", 6, 3, 1);
+    temp[4][0] = new content();
+    temp[5][0] = new content();
+    temp[3][1] = new content("result folder", 6);
+    temp[3][2] = new content(reportFolder, 5);
     String savedData = "";
     if (this.savePdf)
       savedData = savedData + ".pdf"; 
@@ -428,34 +501,46 @@ public class metroloJDialog extends GenericDialog {
       } else {
         savedData = savedData + ", .xls";
       }  
-    temp[1][1] = new content("type of saved data", 6);
-    temp[1][2] = new content(savedData, 5);
-    temp[2][1] = new content("input data bit depth", 6);
-    temp[2][2] = new content("" + this.bitDepth, 5);
-    temp[3][0] = new content("dimension order", 6, 1, 2);
-    temp[3][1] = new content();
-    temp[3][2] = new content(microscope.DIMENSION_ORDER[this.dimensionOrder], 5);
-    temp[4][0] = new content("discard saturated samples", 6, 1, 2);
-    temp[4][1] = new content();
-    temp[4][2] = new content("" + this.saturationChoice, 5);
-    temp[5][0] = new content("beads", 6, rows - 5, 1);
-    temp[5][1] = new content("multiple beads in image", 6);
-    if (rows > 6)
-      for (int row = 6; row < rows; ) {
-        temp[row][0] = new content();
-        row++;
-      }  
-    temp[5][2] = new content("" + this.multipleBeads, 5);
-    if (this.multipleBeads) {
-      temp[6][1] = new content("bead detection channel", 0);
-      temp[6][2] = new content("" + this.beadChannel, 5);
-      temp[7][1] = new content("bead size (", 0);
-      temp[7][2] = new content("" + this.beadSize, 5);
-      temp[8][1] = new content("bead crop Factor", 0);
-      temp[8][2] = new content("" + this.cropFactor, 5);
-      temp[9][1] = new content("bead rejection distance to top/bottom   ", 0);
-      temp[9][2] = new content("" + this.beadMinDistanceToTopBottom+" "+IJ.micronSymbol+"m", 5);
-    } 
+    temp[4][1] = new content("type of saved data", 6);
+    temp[4][2] = new content(savedData, 5);
+    temp[5][1] = new content("input data bit depth", 6);
+    temp[5][2] = new content("" + this.bitDepth, 5);
+    temp[6][0] = new content("dimension order", 6, 1, 2);
+    temp[6][1] = new content();
+    temp[6][2] = new content(microscope.DIMENSION_ORDER[this.dimensionOrder], 5);
+    temp[7][0] = new content("discard saturated samples", 6, 1, 2);
+    temp[7][1] = new content();
+    temp[7][2] = new content("" + this.saturationChoice, 5);
+    if (useBeads){
+        if (multipleBeads){
+            temp[8][0] = new content("beads", 6, 6, 1);
+            for (int row = 9; row < rows;row++) temp[row][0] = new content(); 
+        }
+        else {
+            temp[8][0] = new content("beads", 6, 2, 1);
+            temp[9][0] = new content();
+        }
+        temp[8][1] = new content("Background anulus thickness in "+IJ.micronSymbol+"m",6);
+        
+        if (finalAnulusThickness.isEmpty()) {
+            if (debugMode)IJ.log("(in MetroloJDialog>compileDialogHeader) finalAnulusThickness is empty");
+            temp[8][2] = new content("" + this.anulusThickness, 5);
+        }
+        else temp[8][2] = new content(this.finalAnulusThickness, 5);
+        temp[9][1] = new content("multiple beads in image", 6);
+        temp[9][2] = new content("" + this.multipleBeads, 5);
+        if (this.multipleBeads) {          
+            temp[10][1] = new content("bead detection channel", 0);
+            temp[10][2] = new content("" + this.beadChannel, 5);
+            temp[11][1] = new content("bead size ("+IJ.micronSymbol+"m)", 0);
+            temp[11][2] = new content("" + this.beadSize, 5);
+            temp[12][1] = new content("bead crop Factor", 0);
+            temp[12][2] = new content("" + this.cropFactor, 5);
+            temp[13][1] = new content("bead rejection distance to top/bottom   ", 0);
+            temp[13][2] = new content("" + this.beadMinDistanceToTopBottom+" "+IJ.micronSymbol+"m", 5);
+        }
+    }    
     this.dialogHeader = temp;
   }
+  
 }

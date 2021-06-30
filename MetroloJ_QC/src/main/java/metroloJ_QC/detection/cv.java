@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import metroloJ_QC.importer.simpleMetaData;
 import metroloJ_QC.report.utilities.content;
 import metroloJ_QC.setup.detector;
 import metroloJ_QC.utilities.doCheck;
@@ -29,6 +30,8 @@ import metroloJ_QC.utilities.tricks.fileTricks;
 import metroloJ_QC.utilities.tricks.imageTricks;
 
 public class cv implements Measurements {
+  String creationDate="";
+    
   public detector det = null;
   
   public ImagePlus[] ip = null;
@@ -53,7 +56,9 @@ public class cv implements Measurements {
   
   int max;
   
-  public cv(ImagePlus image, detector conditions, boolean saturationChoice, Double channelChoice) {
+  public cv(ImagePlus image, detector conditions, boolean saturationChoice, Double channelChoice, boolean debugMode, String creationDate) {
+    this.creationDate=creationDate;
+    if (debugMode) IJ.log("(in cv) creation date: "+creationDate);
     this.det = conditions;
     String name = fileTricks.cropName(image.getShortTitle());
     this.rm = RoiManager.getRoiManager();
@@ -63,12 +68,12 @@ public class cv implements Measurements {
       return;
     } 
     if (image.getNSlices() > 1 && image.getNFrames() > 1) {
-      IJ.showMessage("CV report dialog", "The analysis will be run on the selected Z slice and time frame");
+      IJ.showMessage("VC report dialog", "The analysis will be run on the selected Z slice and time frame");
     } else {
       if (image.getNSlices() > 1)
-        IJ.showMessage("CV report dialog", "The analysis will be run on the selected Z slice"); 
+        IJ.showMessage("VC report dialog", "The analysis will be run on the selected Z slice"); 
       if (image.getNFrames() > 1)
-        IJ.showMessage("CV report dialog", "The analysis will be run on the selected time frame"); 
+        IJ.showMessage("VC report dialog", "The analysis will be run on the selected time frame"); 
     } 
     int zpos = image.getSlice();
     int timeFrame = image.getFrame();
@@ -94,7 +99,7 @@ public class cv implements Measurements {
         this.result = true; 
     } 
     if (this.result) {
-      this.det.getSpecs(name, this.saturation, channelChoice);
+      this.det.getSpecs(name, this.saturation, channelChoice, creationDate);
       this.detSection = this.det.reportHeader;
       if (channelChoice.isNaN()) {
         for (int i = 0; i < this.ip.length; i++) {
@@ -112,7 +117,7 @@ public class cv implements Measurements {
             } 
             tempCV[j] = (tempStats[j]).stdDev / (tempStats[j]).mean;
           } 
-          this.minCV[i] = dataTricks.min(tempCV);
+          this.minCV[i] = dataTricks.getMin(tempCV);
           this.cv[i] = tempCV;
           this.stats[i] = tempStats;
           this.histograms[i] = tempHisto;
@@ -133,7 +138,7 @@ public class cv implements Measurements {
           } 
           tempCV[j] = (tempStats[j]).stdDev / (tempStats[j]).mean;
         } 
-        this.minCV[channelToAnalyse] = dataTricks.min(tempCV);
+        this.minCV[channelToAnalyse] = dataTricks.getMin(tempCV);
         this.cv[channelToAnalyse] = tempCV;
         this.stats[channelToAnalyse] = tempStats;
         this.histograms[channelToAnalyse] = tempHisto;
@@ -153,9 +158,9 @@ public class cv implements Measurements {
   public String tableToString(Double channelChoice) {
     String out;
     if (channelChoice.isNaN()) {
-      out = "Channel\tStandard deviation\tAverage\tNb pixels\tCV";
+      out = "Channel\tStandard deviation\tAverage\tNb pixels\tVC";
       if (this.rm.getCount() > 1)
-        out = out + "\tROI\tCVs relative to min value\n"; 
+        out = out + "\tROI\tVCs relative to min value\n"; 
       for (int i = 0; i < this.ip.length; i++) {
         for (int j = 0; j < this.max; j++) {
           String line = "" + i + "\t" + (this.stats[i][j]).stdDev + "\t" + (this.stats[i][j]).mean + "\t" + (int)(this.stats[i][j]).area + "\t" + this.cv[i][j];
@@ -168,9 +173,9 @@ public class cv implements Measurements {
       } 
     } else {
       int channelToAnalyse = (int)Math.round(channelChoice.doubleValue());
-      out = "Standard deviation\tAverage\tNb pixels\tCV";
+      out = "Standard deviation\tAverage\tNb pixels\tVC";
       if (this.rm.getCount() > 1)
-        out = out + "\tROI\tCVs relative to min value\n"; 
+        out = out + "\tROI\tVCs relative to min value\n"; 
       for (int j = 0; j < this.max; j++) {
         String line = "" + (this.stats[channelToAnalyse][j]).stdDev + "\t" + (this.stats[channelToAnalyse][j]).mean + "\t" + (int)(this.stats[channelToAnalyse][j]).area + "\t" + this.cv[channelToAnalyse][j];
         if (this.rm.getCount() > 1) {
@@ -254,9 +259,9 @@ public class cv implements Measurements {
     out[1][0] = new content("Standard deviation", 0);
     out[2][0] = new content("Average", 0);
     out[3][0] = new content("Nb pixels", 0);
-    out[4][0] = new content("CV", 0);
+    out[4][0] = new content("VC", 0);
     if (this.rm.getCount() > 1)
-      out[5][0] = new content("CVs relative to min CV value", 0); 
+      out[5][0] = new content("VCs relative to min VC value", 0); 
     for (int j = 0; j < this.max; j++) {
       out[0][j + 1] = new content(this.rm.getName(j), 0);
       out[1][j + 1] = new content("" + dataTricks.round((this.stats[channelID][j]).stdDev, 3), 0);
@@ -370,7 +375,7 @@ public class cv implements Measurements {
   public void saveData(String path, String filename, boolean shorten, Double channelChoice) {
     if (!shorten)
       saveHistogramsTable(path + filename + "_histogram.xls", channelChoice); 
-    fileTricks.save(tableToString(channelChoice), path + filename + "_CV.xls");
+    fileTricks.save(tableToString(channelChoice), path + filename + "_VC.xls");
     if (this.rm.getCount() == 1) {
       fileTricks.saveRoi(this.rm.getRoi(0), path + this.rm.getName(0) + "_roi.roi");
     } else {

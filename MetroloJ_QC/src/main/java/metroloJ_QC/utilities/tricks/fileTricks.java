@@ -91,12 +91,18 @@ public class fileTricks {
   }
   
   public static String cropExtension(String path) {
-    String name = path;
+    String output = path;
     if (path.contains(".")) {
-      int nb = path.lastIndexOf(".");
-      name = path.substring(0, nb);
+        int nb = path.lastIndexOf(".");
+        if (path.length()<75){
+            output = path.substring(0, nb);
+        }
+        else {
+            output="";
+            for (int n=0; n<nb; n++) output+=path.charAt(n);
+        }
     } 
-    return name;
+    return output;
   }
   
   public static void showPdf(String path) {

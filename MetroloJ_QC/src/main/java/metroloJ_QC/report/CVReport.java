@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import metroloJ_QC.detection.cv;
+import metroloJ_QC.importer.simpleMetaData;
 import metroloJ_QC.report.utilities.ReportSections;
 import metroloJ_QC.report.utilities.content;
 import metroloJ_QC.setup.detector;
@@ -29,14 +30,16 @@ public class CVReport {
   
   ImagePlus histogram;
   
+  String creationDate="";
+  
   String title = "";
   
-  public CVReport(metroloJDialog mjd, detector conditions, String title, Double channelChoice) {
-    this.cv = new cv(mjd.ip, conditions, mjd.saturationChoice, channelChoice);
+  public CVReport(metroloJDialog mjd, detector conditions, String title, Double channelChoice, String creationDate) {
+    this.creationDate=creationDate;
+    this.cv = new cv(mjd.ip, conditions, mjd.saturationChoice, channelChoice, mjd.debugMode, this.creationDate);
     this.det = conditions;
-    this.title = this.det.date + "\nCV report";
-    if (!title.equals(""))
-      this.title += "\n" + title; 
+    this.title = title;
+    
   }
   
   public void saveReport(metroloJDialog mjd, String path, Double channelChoice) {
@@ -47,9 +50,9 @@ public class CVReport {
         PdfWriter writer = PdfWriter.getInstance(report, new FileOutputStream(path));
         report.open();
         writer.setStrictImageSequence(true);
-        report.add((Element)this.rs.logoRTMFM());
+        report.add((Element)this.rs.logo("cv.png", 100.0F, mjd.debugMode));
         report.add((Element)this.rs.bigTitle(this.title));
-        String sectionTitle = "Microscope infos:";
+        String sectionTitle = "Microscope info:";
         String text = "";
         content[][] summary = this.cv.detSection;
         PdfPTable table = this.rs.table(summary, 75.0F, true);
@@ -61,7 +64,7 @@ public class CVReport {
         if (text != "(No saturated pixels detected).")
           text = text + " Check that selected ROI(s) are not saturated"; 
         report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, null, text));
-        sectionTitle = "ROIs used for measures:";
+        sectionTitle = "ROIs used for measurements:";
         roiImage = this.cv.getPanel(mjd.scale);
         float zoom2scale = (20000 / Math.max(roiImage.getWidth(), roiImage.getHeight()));
         report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, roiImage, zoom2scale, null, ""));
@@ -95,22 +98,22 @@ public class CVReport {
         } 
         report.newPage();
         if (!this.det.sampleInfos.equals("")) {
-          report.add((Element)this.rs.title("Sample infos:"));
+          report.add((Element)this.rs.title("Sample info:"));
           report.add((Element)this.rs.paragraph(this.det.sampleInfos));
         } 
         if (!this.det.comments.equals("")) {
           report.add((Element)this.rs.title("Comments:"));
           report.add((Element)this.rs.paragraph(this.det.comments));
         } 
-        mjd.compileDialogHeader(path.substring(0, path.lastIndexOf(".pdf")));
+        mjd.compileDialogHeader(path);
         sectionTitle = "Analysis parameters";
         text = "";
-        int rows = 5;
+        int rows = 6;
         if (!channelChoice.isNaN() || this.cv.ip.length > 1)
-          rows = 7; 
+          rows+=2; 
         int cols = 3;
         summary = new content[rows][cols];
-        content[][] temp = content.subtable(mjd.dialogHeader, 0, 4, 0, 2);
+        content[][] temp = content.subtable(mjd.dialogHeader, 0, 5, 0, 2);
         for (int row = 0; row < temp.length; row++) {
           for (int col = 0; col < (temp[row]).length; ) {
             summary[row][col] = temp[row][col];
@@ -118,19 +121,19 @@ public class CVReport {
           } 
         } 
         if (!channelChoice.isNaN() || this.cv.ip.length > 1) {
-          summary[5][0] = new content("Channels", 6, 2, 1);
-          summary[6][0] = new content();
-          summary[5][1] = new content("Use one channel only", 6);
+          summary[rows-2][0] = new content("Channels", 6, 2, 1);
+          summary[rows-1][0] = new content();
+          summary[rows-2][1] = new content("Use one channel only", 6);
           if (channelChoice.isNaN()) {
-            summary[5][2] = new content("false", 5);
+            summary[rows-2][2] = new content("false", 5);
           } else {
-            summary[5][2] = new content("true", 5);
+            summary[rows-2][2] = new content("true", 5);
           } 
-          summary[6][1] = new content("channel used if true", 6);
+          summary[rows-1][1] = new content("channel used if true", 6);
           if (channelChoice.isNaN()) {
-            summary[6][2] = new content("-", 5);
+            summary[rows-1][2] = new content("-", 5);
           } else {
-            summary[6][2] = new content("" + (int)Math.round(channelChoice.doubleValue()), 5);
+            summary[rows-1][2] = new content("" + (int)Math.round(channelChoice.doubleValue()), 5);
           } 
         } 
         table = this.rs.table(summary, 80.0F, true);

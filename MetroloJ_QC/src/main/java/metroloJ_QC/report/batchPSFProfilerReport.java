@@ -60,38 +60,51 @@ public class batchPSFProfilerReport {
   
   List<Double>[] rawRatiosTable;
   
-  public batchPSFProfilerReport(ArrayList<PSFprofiler> list, microscope conditions, String title) {
+  List<Double> [] rawSBR;
+  
+  private boolean debugMode;
+  
+  public batchPSFProfilerReport(ArrayList<PSFprofiler> list, microscope conditions, String title, boolean debugMode) {
     this.micro = conditions;
-    this.title = this.micro.date + "\nBatch PSF Profiler report";
+    this.debugMode=debugMode;
+    this.title = title;
     this.nReports = list.size();
-    if (!title.equals(""))
-      this.title += "\n" + title; 
     this.finalResolutionTable = new Double[this.micro.emWavelengths.length][3][4];
   }
   
   public void aggregatePPRs(ArrayList<PSFprofiler> pps, metroloJDialog mjd, int dimension) {
     List[] arrayOfList1 = new List[this.micro.emWavelengths.length];
     List[] arrayOfList2 = new List[this.micro.emWavelengths.length];
+    List[] arrayOfList3 = new List[this.micro.emWavelengths.length];
     for (int i = 0; i < this.micro.emWavelengths.length; i++) {
       List<Double> tempRes = new ArrayList<>();
       List<Double> tempR2 = new ArrayList<>();
+      List<Double> tempSBR = new ArrayList<>();
       for (int m = 0; m < pps.size(); m++) {
+        tempSBR.add((Double)pps.get(m).SBRatio[i]);
+        //IJ.log("(in BPPReport aggregate PPRs)channel "+i+", dimension:"+dimension+", bead "+m+", res "+pps.get(m).resol[i][dimension]);    
         tempRes.add(Double.valueOf(((PSFprofiler)pps.get(m)).resol[i][dimension]));
+        
         switch (dimension) {
           case 0:
             tempR2.add(Double.valueOf(((PSFprofiler)pps.get(m)).xR2[i]));
+            //IJ.log("(in BPPReport aggregate PPRs)channel "+i+", dimension:"+dimension+", bead "+m+", r2 "+pps.get(m).xR2[i]);  
             break;
           case 1:
             tempR2.add(Double.valueOf(((PSFprofiler)pps.get(m)).yR2[i]));
+            //IJ.log("(in BPPReport aggregate PPRs)channel "+i+", dimension:"+dimension+", bead "+m+", r2 "+pps.get(m).yR2[i]);
             break;
           case 2:
             tempR2.add(Double.valueOf(((PSFprofiler)pps.get(m)).zR2[i]));
+            //IJ.log("(in BPPReport aggregate PPRs)channel "+i+", dimension:"+dimension+", bead "+m+", r2 "+pps.get(m).zR2[i]);
             break;
         } 
       } 
       arrayOfList1[i] = tempRes;
       arrayOfList2[i] = tempR2;
+      arrayOfList3[i] = tempSBR;      
     } 
+    rawSBR=(List<Double>[]) arrayOfList3;
     switch (dimension) {
       case 0:
         this.rawXRes = (List<Double>[])arrayOfList1;
@@ -116,25 +129,31 @@ public class batchPSFProfilerReport {
       saturations.add(((PSFprofiler)pps.get(k)).saturation);
       k++;
     } 
+
     this.saturationProportion = doCheck.compileProportionOfUnsaturatedImages(saturations);
     this.samplingProportion = doCheck.compileProportionOfCorrectlySampledImages(micros);
+    //IJ.log("(in BPP report aggregate) rawSBR[0] length "+rawSBR[0].size());
+    //IJ.log("(in BPP report aggregate) rawXRes[0] length "+rawXRes[0].size());
     this.micro.getSpecs(this.saturationProportion, this.samplingProportion, this.nReports);
     this.microSection = this.micro.reportHeader;
   }
   
   public void compilePPRs(metroloJDialog mjd, double R2Threshold) {
-    Double[][][] temp = new Double[this.micro.emWavelengths.length][3][4];
+    Double[][][] temp = new Double[this.micro.emWavelengths.length][3][5];
     for (int i = 0; i < this.micro.emWavelengths.length; i++) {
       for (int dim = 0; dim < 3; dim++) {
         switch (dim) {
           case 0:
-            temp[i][dim] = filterList(this.rawXRes[i], this.rawXR2[i], mjd.outliers, R2Threshold);
+            //IJ.log("(in BPPReport compile PPRs)channel "+i+", dimension: X");
+            temp[i][dim] = filterList(this.rawXRes[i], this.rawXR2[i],this.rawSBR[i], mjd.outliers, R2Threshold);
             break;
           case 1:
-            temp[i][dim] = filterList(this.rawYRes[i], this.rawYR2[i], mjd.outliers, R2Threshold);
+            //IJ.log("(in BPPReport compile PPRs)channel "+i+", dimension: Y");  
+            temp[i][dim] = filterList(this.rawYRes[i], this.rawYR2[i],this.rawSBR[i], mjd.outliers, R2Threshold);
             break;
           case 2:
-            temp[i][dim] = filterList(this.rawZRes[i], this.rawZR2[i], mjd.outliers, R2Threshold);
+           //IJ.log("(in BPPReport compile PPRs)channel "+i+", dimension: Z");  
+            temp[i][dim] = filterList(this.rawZRes[i], this.rawZR2[i],this.rawSBR[i], mjd.outliers, R2Threshold);
             break;
         } 
         temp[i][dim][2] = Double.valueOf(((double[])this.micro.resolutions.get(i))[dim]);
@@ -143,31 +162,51 @@ public class batchPSFProfilerReport {
     this.finalResolutionTable = temp;
   }
   
-  public static Double[] filterList(List<Double> list1, List<Double> list2, boolean outliersChoice, double threshold) {
-    Double[] output = new Double[5];
-    List<Double[]> temp = new ArrayList<>();
-    Double [] combi=new Double[2];
-    for (int k = 0; k < list1.size(); k++) {
-        if (((Double)list2.get(k)).doubleValue() > threshold){
-            combi[0]=list1.get(k);
-            combi[1]=list2.get(k);
-            temp.add(combi);
+  public static Double[] filterList(List<Double> resList, List<Double> r2List, List<Double> sbrList, boolean outliersChoice, double threshold) {
+    Double[] output = new Double[6];
+    Double[][] temp = new Double [resList.size()][3];
+    //IJ.log("(in BPP report aggregate) resList length "+resList.size()+", r2List length "+r2List.size()+"sbrList length "+sbrList.size());
+    if (!resList.isEmpty()){
+        for (int k = 0; k < resList.size(); k++) {
+            Double [] combi=new Double[3];
+            combi[0]=resList.get(k);
+            combi[1]=r2List.get(k);
+            combi[2]=sbrList.get(k);
+            temp[k]=combi;
+        }    
+        List[] resR2Sbr = dataTricks.purge2(temp);
+        //for (int i=0; i<resR2[0].size(); i++)IJ.log("(in BPP report Filterlist after purge) res "+i+", "+resR2Sbr[0].get(i));
+        if (outliersChoice){
+            List[]input= new List[3];
+            List<Double> temp0 = new ArrayList<>();
+            List<Double> temp1 = new ArrayList<>();
+            List<Double> temp2 = new ArrayList<>();
+            for (int i=0; i<resR2Sbr[0].size(); i++){
+                temp0.add((Double)resR2Sbr[0].get(i));
+                temp1.add((Double)resR2Sbr[1].get(i));
+                temp2.add((Double)resR2Sbr[2].get(i));
+            }
+            input[0]=temp0;
+            input[1]=temp1;
+            input[2]=temp2;
+            resR2Sbr[0].clear();
+            resR2Sbr[1].clear();
+            resR2Sbr[2].clear();
+            List[] outliersOutput = dataTricks.removeOutliers2(input);
+            resR2Sbr[0]=outliersOutput[0];
+            resR2Sbr[1]=outliersOutput[1];
+            resR2Sbr[2]=outliersOutput[2];
         }
-    } 
-    temp = dataTricks.purge2(temp);
-    if (outliersChoice)
-      temp = dataTricks.removeOutliers2(temp);
-    List<Double> res = new ArrayList<>();
-    List<Double> R2 = new ArrayList<>();
-    for(int n=0; n<temp.size(); n++){
-        res.add(temp.get(n)[0]);
-        R2.add(temp.get(n)[1]);
+        output[0] = dataTricks.getMean(resR2Sbr[0]);
+        output[1] = Double.valueOf(dataTricks.getSD(resR2Sbr[0]));
+        output[2] = Double.valueOf(Double.NaN);
+        output[3] = Double.valueOf(resR2Sbr[0].size());
+        output[4]=Double.valueOf(dataTricks.getMean(resR2Sbr[1]));
+        output[5]=Double.valueOf(dataTricks.getMean(resR2Sbr[2]));
     }
-    output[0] = dataTricks.getMean(res);
-    output[1] = Double.valueOf(dataTricks.getSD(res));
-    output[2] = Double.valueOf(Double.NaN);
-    output[3] = Double.valueOf(temp.size());
-    output[4]=Double.valueOf(dataTricks.getMean(R2));
+    else {
+        for (int i=0; i<6; i++)output[i]=Double.NaN;
+    }
     return output;
   }
   
@@ -188,7 +227,7 @@ public class batchPSFProfilerReport {
           output[i + 1][dim + 1] = new content("" + dataTricks.round(this.finalResolutionTable[i][dim][0].doubleValue(), 3), 0);
           if (!this.finalResolutionTable[i][dim][1].isNaN())
             (output[i + 1][dim + 1]).value += " +/- " + dataTricks.round(this.finalResolutionTable[i][dim][1].doubleValue(), 3) + " " + IJ.micronSymbol+ "m"; 
-          (output[i + 1][dim + 1]).value += "\n " + dataTricks.round(this.finalResolutionTable[i][dim][3].doubleValue(), 0) + " beads\n(" + dataTricks.round(this.finalResolutionTable[i][dim][2].doubleValue(), 3) + " " + IJ.micronSymbol+ "m)\n mean R2: "+ dataTricks.round(this.finalResolutionTable[i][dim][4].doubleValue(), 2);
+          (output[i + 1][dim + 1]).value += "\n " + dataTricks.round(this.finalResolutionTable[i][dim][3].doubleValue(), 0) + " beads\n(" + dataTricks.round(this.finalResolutionTable[i][dim][2].doubleValue(), 3) + " " + IJ.micronSymbol+ "m)\n mean R2: "+ dataTricks.round(this.finalResolutionTable[i][dim][4].doubleValue(), 2)+"\n mean SBR: "+ dataTricks.round(this.finalResolutionTable[i][dim][5].doubleValue(), 2);
         } 
       } 
     } 
@@ -263,10 +302,10 @@ public class batchPSFProfilerReport {
       PdfWriter writer = PdfWriter.getInstance(report, new FileOutputStream(path + "summary.pdf"));
       report.open();
       writer.setStrictImageSequence(true);
-      report.add((Element)this.rs.logoRTMFM());
+      report.add((Element)this.rs.logo("bpp.png", 100.0F, debugMode));
       String main = this.title + " - SUMMARY";
       report.add((Element)this.rs.bigTitle(main));
-      String sectionTitle = "Microscope infos:";
+      String sectionTitle = "Microscope info:";
       String text = "";
       content[][] summary = this.microSection;
       PdfPTable table = this.rs.table(summary, 95.0F, true);
@@ -302,48 +341,53 @@ public class batchPSFProfilerReport {
       report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, table, text));
       report.newPage();
       if (!this.micro.sampleInfos.equals("")) {
-        report.add((Element)this.rs.title("Sample infos:"));
+        report.add((Element)this.rs.title("Sample info:"));
         report.add((Element)this.rs.paragraph(this.micro.sampleInfos));
       } 
       if (!this.micro.comments.equals("")) {
         report.add((Element)this.rs.title("Comments:"));
         report.add((Element)this.rs.paragraph(this.micro.comments));
-      } 
+      }
+      mjd.finalAnulusThickness=""+dataTricks.round(mjd.anulusThickness, 2)+" (theoretical, see individual reports for real, used values)";
       mjd.compileDialogHeader(path);
-      if (mjd.useTolerance) {
-        rows = mjd.dialogHeader.length + 5;
-      } else {
-        rows = mjd.dialogHeader.length + 3;
-      } 
-      int cols = (mjd.dialogHeader[0]).length;
-      content[][] header = new content[rows][cols];
-      int row;
-      for (row = 0; row < mjd.dialogHeader.length; row++) {
-        for (int col = 0; col < (mjd.dialogHeader[0]).length; ) {
-          header[row][col] = mjd.dialogHeader[row][col];
-          col++;
+        if (mjd.useTolerance) {
+          rows = mjd.dialogHeader.length + 5;
+        } else {
+          rows = mjd.dialogHeader.length + 3;
         } 
-      } 
-      header[mjd.dialogHeader.length][0] = new content("outliers removed", 6, 1, 2);
-      header[mjd.dialogHeader.length][1] = new content();
-      header[mjd.dialogHeader.length][2] = new content("" + mjd.outliers, 5);
-      header[mjd.dialogHeader.length + 1][0] = new content("discard R2 ratio below", 6, 1, 2);
-      header[mjd.dialogHeader.length + 1][1] = new content();
-      header[mjd.dialogHeader.length + 1][2] = new content("" + R2Ratio, 5);
-      header[mjd.dialogHeader.length + 2][0] = new content("Tolerance", 6, rows - mjd.dialogHeader.length + 1, 1);
-      if (mjd.useTolerance)
-        for (row = mjd.dialogHeader.length + 3; row < header.length; ) {
-          header[row][0] = new content();
-          row++;
-        }  
-      header[mjd.dialogHeader.length + 2][1] = new content("applied in this report", 6);
-      header[mjd.dialogHeader.length + 2][2] = new content("" + mjd.useTolerance, 5);
-      if (mjd.useTolerance) {
-        header[mjd.dialogHeader.length + 3][1] = new content("X & Y FWHM ratios valid if below", 0);
-        header[mjd.dialogHeader.length + 3][2] = new content("" + XYratioTolerance, 5);
-        header[mjd.dialogHeader.length + 4][1] = new content("Z FWHM ratio valid if below", 0);
-        header[mjd.dialogHeader.length + 4][2] = new content("" + ZratioTolerance, 5);
-      } 
+        int cols = (mjd.dialogHeader[0]).length;
+        content[][] header = new content[rows][cols];
+        int row;
+        for (row = 0; row < mjd.dialogHeader.length; row++) {
+          for (int col = 0; col < (mjd.dialogHeader[0]).length; ) {
+            header[row][col] = mjd.dialogHeader[row][col];
+            col++;
+          } 
+        } 
+        header[mjd.dialogHeader.length][0] = new content("outliers removed", 6, 1, 2);
+        header[mjd.dialogHeader.length][1] = new content();
+        header[mjd.dialogHeader.length][2] = new content("" + mjd.outliers, 5);
+        header[mjd.dialogHeader.length + 1][0] = new content("discard R2 ratio below", 6, 1, 2);
+        header[mjd.dialogHeader.length + 1][1] = new content();
+        header[mjd.dialogHeader.length + 1][2] = new content("" + R2Ratio, 5);
+        if (mjd.useTolerance) {
+            header[mjd.dialogHeader.length + 2][0] = new content("Tolerance", 6, 3, 1);
+            for (row = mjd.dialogHeader.length + 3; row < mjd.dialogHeader.length + 5; row++ ) header[row][0] = new content();
+            } 
+        else {
+            header[mjd.dialogHeader.length + 2][0] = new content("Tolerance", 6, 1, 1);
+        }
+        header[mjd.dialogHeader.length + 2][1] = new content("applied in this report", 6);
+        header[mjd.dialogHeader.length + 2][2] = new content("" + mjd.useTolerance, 5);
+
+        if (mjd.useTolerance) {
+          header[mjd.dialogHeader.length + 3][1] = new content("X & Y FWHM ratios valid if below", 0);
+          header[mjd.dialogHeader.length + 3][2] = new content("" + XYratioTolerance, 5);
+          header[mjd.dialogHeader.length + 4][1] = new content("Z FWHM ratio valid if below", 0);
+          header[mjd.dialogHeader.length + 4][2] = new content("" + ZratioTolerance, 5);
+        } 
+        
+        
       sectionTitle = "Analysis parameters";
       text = "";
       table = this.rs.table(header, 80.0F, true);
@@ -353,6 +397,27 @@ public class batchPSFProfilerReport {
       report.newPage();
       report.add((Element)this.rs.title("Analysed images & beads:"));
       report.add((Element)this.rs.paragraph(analysedImages));
+      report.newPage();
+      sectionTitle = "Formulas used:";
+      text = "";
+      String temp="PP_";
+      switch (mjd.microtype){
+        case microscope.WIDEFIELD: 
+            temp+="WIDEFIELD";
+            break;
+        case microscope.CONFOCAL: 
+            temp+="CONFOCAL";
+            break;
+        case microscope.SPINNING: 
+            temp+="SPINNING";
+            break;
+        case microscope.MULTIPHOTON: 
+            temp+="MULTIPHOTON";
+            break;
+        }
+        temp+="_formulas.png";
+        report.add((Element)this.rs.wholeSection(sectionTitle, this.rs.TITLE, null, text));
+        report.add((Element)this.rs.logo(temp, 90.0F, debugMode));
       report.close();
     } catch (FileNotFoundException|com.itextpdf.text.DocumentException ex) {
       IJ.error("Error occured while generating/saving the report");

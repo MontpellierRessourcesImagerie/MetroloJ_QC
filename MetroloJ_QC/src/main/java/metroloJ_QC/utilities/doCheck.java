@@ -7,6 +7,7 @@ import ij.gui.Roi;
 import ij.gui.ShapeRoi;
 import ij.measure.Calibration;
 import ij.plugin.ImageCalculator;
+import ij.measure.Measurements;
 import ij.plugin.MontageMaker;
 import ij.plugin.RoiEnlarger;
 import ij.plugin.filter.ThresholdToSelection;
@@ -15,18 +16,28 @@ import ij.process.AutoThresholder;
 import ij.process.ImageStatistics;
 import java.util.List;
 import metroloJ_QC.setup.microscope;
+import metroloJ_QC.setup.metroloJDialog;
 import metroloJ_QC.utilities.tricks.imageTricks;
+import ij.plugin.filter.Filler;
 
 public class doCheck {
+public static final String version="1.53e";
+
   public static boolean isVersionUpToDate() {
-    return !IJ.versionLessThan("1.53e");
+    return !IJ.versionLessThan(version);
+  }
+  
+public static String getIsVersionUpToDate() {
+    String output="";
+    if (IJ.versionLessThan(version)) output="Version should be "+version+" or more.\n";
+    return (output);
   }
   
   public static boolean isTStack(boolean showMessage) {
-    if (WindowManager.getImageCount() != 0 && WindowManager.getCurrentImage().getNFrames() != 1)
+    if (WindowManager.getCurrentImage().getNFrames() != 1)
       return true; 
     if (showMessage)
-      IJ.error("The image should contain more than a single time frame"); 
+      IJ.error("The stack should contain more than a single time frame."); 
     return false;
   }
   
@@ -34,11 +45,15 @@ public class doCheck {
     return isTStack(true);
   }
   
+  public static String getIsTStack() {
+    String output="";
+    if (WindowManager.getCurrentImage().getNFrames() == 1) output="The stack should contain more than a single time frame.\n";
+    return (output);
+  }
+  
   public static boolean isThereAnImage(boolean showMessage) {
-    if (WindowManager.getImageCount() != 0)
-      return true; 
-    if (showMessage)
-      IJ.error("Please, open an image first..."); 
+    if (WindowManager.getImageCount() != 0) return true; 
+    if (showMessage) IJ.error("Please, open an image first..."); 
     return false;
   }
   
@@ -46,19 +61,34 @@ public class doCheck {
     return isThereAnImage(true);
   }
   
+  public static String getIsThereAnImage() {
+    String output="";
+    if (WindowManager.getImageCount() == 0) output="No Images found.\n";
+    return (output);
+  }
+  
   public static boolean isZStack(boolean showMessage) {
-    if (WindowManager.getImageCount() != 0 && WindowManager.getCurrentImage().getNSlices() != 1)
+    if (WindowManager.getCurrentImage().getNSlices() != 1)
       return true; 
     if (showMessage)
-      IJ.error("The image is expected to be a stack..."); 
+      IJ.error("The image is not a Z stack."); 
     return false;
+  }
+ 
+  public static boolean isZStack() {
+    return isZStack(true);
+  }
+  public static String getIsZStack() {
+    String output="";
+    if (WindowManager.getCurrentImage().getNSlices() == 1) output="The image is not a Z stack.\n";
+    return (output);
   }
   
   public static boolean isNoZStack(boolean showMessage) {
-    if (WindowManager.getImageCount() != 0 && WindowManager.getCurrentImage().getNSlices() == 1)
+    if (WindowManager.getCurrentImage().getNSlices() == 1)
       return true; 
     if (showMessage)
-      IJ.error("The image contains Z slices and can't be treated, use a time-stack only"); 
+      IJ.error("The image contains Z slices and can't be treated, use a time-stack only."); 
     return false;
   }
   
@@ -66,21 +96,35 @@ public class doCheck {
     return isNoZStack(true);
   }
   
-  public static boolean isZStack() {
-    return isZStack(true);
-  }
+   public static String getIsNoZStack() {
+    String output="";
+    if (WindowManager.getCurrentImage().getNSlices() != 1) output="The image contains Z slices and can't be treated, use a time-stack only.\n";
+    return (output);
+   }
   
   public static boolean isCalibrated(boolean showMessage) {
     if (WindowManager.getImageCount() != 0 && !WindowManager.getCurrentImage().getCalibration().getUnit().equals("pixel"))
       return true; 
     if (showMessage)
-      IJ.error("The image is expected to be calibrated..."); 
+      IJ.error("The image is not calibrated."); 
     IJ.run("Properties...");
     return false;
   }
   
   public static boolean isCalibrated() {
     return isCalibrated(true);
+  }
+  
+  public static String getIsCalibrated() {
+    String output="";
+    if (WindowManager.getCurrentImage().getCalibration().getUnit().equals("pixel")) output="The image is not calibrated.\n";
+    return (output);
+  }
+  
+  public static String getIsCalibrated(ImagePlus ip) {
+    String output="";
+    if (ip.getCalibration().getUnit().equals("pixel")) output="uncalibrated";
+    return (output);
   }
   
   public static boolean atLeastNOpenedStacks(int n, boolean showMessage) {
@@ -94,7 +138,7 @@ public class doCheck {
     if (nStacks >= n)
       return true; 
     if (showMessage)
-      IJ.error("At least " + n + " images should be opened..."); 
+      IJ.error("At least " + n + " images or stack should be opened."); 
     return false;
   }
   
@@ -102,16 +146,153 @@ public class doCheck {
     return atLeastNOpenedStacks(n, true);
   }
   
-  public static boolean isNoMoreThan16bits(boolean showMessage) {
-    if (WindowManager.getImageCount() != 0 && WindowManager.getCurrentImage().getBitDepth() <= 16)
+  public static String getAtLeastNOpenedStacks(int n){
+        String output="";
+        int nStacks = 0;
+        int[] idList = WindowManager.getIDList();
+        if (idList != null)
+            for (int i = 0; i < idList.length; i++) {
+            if (WindowManager.getImage(idList[i]).getNSlices() != 1)
+          nStacks++; 
+        }  
+        if (nStacks < n)output="At least " + n + " images or stack should be opened.\n";
+        return output; 
+  }
+
+  public static boolean isThereAStack(boolean showMessage) {
+    if (WindowManager.getCurrentImage().getNFrames() != 1 || WindowManager.getCurrentImage().getNSlices() != 1)
       return true; 
     if (showMessage)
-      IJ.error("The image is expected to be 8- or 16-bits..."); 
+      IJ.error("The image is neither a Z nor T-Stack"); 
+    return false;
+  }
+
+    public static boolean isThereAStack() {
+    return isThereAStack(true);
+  }
+    
+   public static String getIsThereAStack() {
+    String output="";
+    if (WindowManager.getCurrentImage().getNFrames() == 1 && WindowManager.getCurrentImage().getNSlices() == 1) output="The image is neither a Z-Stack nor T-Stack\n"; 
+    return (output);
+   }
+  public static boolean isNoMoreThan16bits(boolean showMessage) {
+    if (WindowManager.getCurrentImage().getBitDepth() <= 16)
+      return true; 
+    if (showMessage)
+      IJ.error("The image or stack should be either 8 or 16-bits.\n"); 
     return false;
   }
   
   public static boolean isNoMoreThan16bits() {
     return isNoMoreThan16bits(true);
+  }
+  
+  public static String getIsNoMoreThan16bits() {
+    String output="";
+    if (WindowManager.getCurrentImage().getBitDepth() > 16) output="The image or stack should be either 8 or 16-bits.\n"; 
+    return (output);
+  }
+
+  public static String getIsNoMoreThan16bits(ImagePlus ip) {
+    String output="";
+    if (ip.getBitDepth() > 16) output=">16 bits"; 
+    return (output);
+  }
+  
+  public static String getIsNChannels(ImagePlus ip, int nChannels) {
+    String output="";
+    if (ip.getNChannels() != nChannels) output="different channels structure"; 
+    return (output);
+  }
+  
+  public static boolean isMultichannel(boolean showMessage) {
+    if (WindowManager.getCurrentImage().getNChannels() != 1)
+      return true; 
+    if (showMessage)
+      IJ.error("The image is not a multichannel image"); 
+    return false;
+  }
+
+    public static boolean isMultichannel() {
+    return isMultichannel(true);
+  }
+  public static String getIsMultichannel() {
+    String output="";
+    if (WindowManager.getCurrentImage().getNChannels() == 1) output="Single channel image"; 
+    return (output);
+  }
+
+
+  
+  public static boolean checkAll(int cOptions){
+    boolean output=false;
+    boolean imageExists=isThereAnImage(false);
+    if ((cOptions&check.VERSION_UP_TO_DATE)!=0){
+      if(!isVersionUpToDate()) return output;
+    }
+    if ((cOptions&check.IMAGE_EXISTS)!=0){
+      if(!imageExists) return output;
+    }
+    if (imageExists) {
+        if ((cOptions&check.IS_CALIBRATED)!=0){
+            if(!isCalibrated()) return output;
+        }
+        if ((cOptions&check.IS_NO_MORE_THAN_16_BITS)!=0){
+            if(!isNoMoreThan16bits(true)) return output;
+        }
+        if ((cOptions&check.IS_MULTICHANNEL)!=0){
+            if(!isMultichannel(true)) return output;
+        }
+        if ((cOptions&check.IS_ZSTACK)!=0){
+            if(!isZStack()) return output;
+        }
+        if ((cOptions&check.IS_NO_ZSTACK)!=0){
+            if(!isNoZStack()) return output;
+        }
+        if ((cOptions&check.IS_TSTACK)!=0){
+            if(!isTStack()) return output;
+        }
+        if ((cOptions&check.IS_STACK)!=0){
+            if(!isThereAStack()) return output;
+        }
+    }    
+    output=true;
+    return (output);
+  }
+  public static String checkAllWithASingleMessage(int cOptions){
+    String error="";
+    boolean imageExists=isThereAnImage(false);
+    if ((cOptions&check.VERSION_UP_TO_DATE)!=0){
+      error+=getIsVersionUpToDate();
+    }
+    if ((cOptions&check.IMAGE_EXISTS)!=0){
+     error+=getIsThereAnImage();
+    }
+    if (imageExists){
+        if ((cOptions&check.IS_CALIBRATED)!=0){
+            error+=getIsCalibrated();
+        }
+        if ((cOptions&check.IS_NO_MORE_THAN_16_BITS)!=0){
+            error+=getIsNoMoreThan16bits();
+        }
+        if ((cOptions&check.IS_MULTICHANNEL)!=0){
+            error+=getIsMultichannel();
+        }
+        if ((cOptions&check.IS_ZSTACK)!=0){
+            error+=getIsZStack();
+        }
+        if ((cOptions&check.IS_NO_ZSTACK)!=0){
+            error+=getIsNoZStack();
+        }
+        if ((cOptions&check.IS_TSTACK)!=0){
+        error+=getIsTStack();
+        }
+        if ((cOptions&check.IS_STACK)!=0){
+        error+=getIsThereAStack();
+        }
+    }    
+    return (error);
   }
   
   public static double computeSaturationRatio(ImagePlus image, boolean workIn3D, int bitDepth) {
@@ -163,59 +344,91 @@ public class doCheck {
     return output;
   }
   
-  public static double[] computeRatios(ImagePlus image, int bitDepth) {
-    double[] output = { Double.NaN, Double.NaN };
-    double maxLimit = Math.pow(2.0D, bitDepth) - 1.0D;
-    Calibration cal = image.getCalibration();
-    Double pix = Double.valueOf(Math.floor(1.0D / cal.pixelWidth));
-    MontageMaker mm = new MontageMaker();
-    ImagePlus montage = mm.makeMontage2(image, 1, image.getNSlices(), 1.0D, 1, image.getNSlices(), 1, 0, false);
-    imageTricks.setCalibrationToPixels(montage);
-    montage.getProcessor().setAutoThreshold(AutoThresholder.Method.Yen, true, 0);
-    ThresholdToSelection tts = new ThresholdToSelection();
-    Roi beadRoi = tts.convert(montage.getProcessor());
+  public static double[] computeRatios(ImagePlus image, metroloJDialog mjd) {
+    double[] output = {Double.NaN, Double.NaN, mjd.anulusThickness };
+    double maxLimit = Math.pow(2.0D, mjd.bitDepth) - 1.0D;
+    Calibration cal = image.getCalibration().copy();
+    Double pix = Double.valueOf(Math.floor(mjd.anulusThickness/cal.pixelWidth));
+    if (mjd.debugMode)IJ.log("(in doCheck>computeRatios) cal.pixelWidth before cal reset"+cal.pixelWidth);
     RoiManager rm = RoiManager.getRoiManager();
     rm.reset();
-    rm.addRoi(beadRoi);
-    rm.rename(0, "beads");
-    ImageStatistics is = montage.getStatistics(259);
-    Double beadsArea = Double.valueOf(is.area);
-    if (beadsArea.doubleValue() == 0.0D)
-      return output; 
-    Double beadsIntensity = Double.valueOf(is.mean * is.area);
-    montage.getProcessor().resetThreshold();
-    ShapeRoi s1 = new ShapeRoi(beadRoi);
-    RoiEnlarger re = new RoiEnlarger();
-    ShapeRoi s2 = new ShapeRoi(RoiEnlarger.enlarge(beadRoi, pix.doubleValue()));
-    ShapeRoi s3 = s1.xor(s2);
-    Roi annuliRoi = s3.shapeToRoi();
-    rm.addRoi(annuliRoi);
-    rm.rename(1, "anuli");
-    montage.setRoi(rm.getRoi(rm.getCount() - 1), true);
-    ImagePlus croppedMontage = montage.crop();
-    ImagePlus mask = new ImagePlus();
-    mask.setProcessor("annuli", rm.getRoi(rm.getCount() - 1).getMask());
-    ImagePlus anuli = ImageCalculator.run(mask, croppedMontage, "multiply create 32-bit");
-    mask.close();
-    croppedMontage.close();
-    anuli.getProcessor().setThreshold(0.0D, anuli.getProcessor().getMax(), 0);
-    is = anuli.getStatistics(259);
-    double anuliArea = is.area;
-    double anuliIntensity = is.mean * is.area / 255.0D;
-    anuli.close();
-    rm.close();
+    MontageMaker mm = new MontageMaker();
+    ImagePlus montage = mm.makeMontage2(image, 1, image.getNSlices(), 1.0D, 1, image.getNSlices(), 1, 0, false);
+    if (mjd.debugMode) montage.show();
+    imageTricks.setCalibrationToPixels(montage);
+    ImageStatistics is;
     double saturatedArea = 0.0D;
     if (montage.getProcessor().getMax() == maxLimit) {
       montage.deleteRoi();
       montage.getProcessor().setThreshold(maxLimit, maxLimit, 2);
-      is = montage.getStatistics(257);
+      is = montage.getStatistics(Measurements.LIMIT+Measurements.AREA);
       saturatedArea = is.area;
       montage.getProcessor().resetThreshold();
+    }
+    
+    montage.getProcessor().setValue(0.0D);
+    montage.getProcessor().setAutoThreshold(AutoThresholder.Method.Yen, true, 0);
+    is = montage.getStatistics(Measurements.LIMIT+Measurements.AREA+Measurements.MEAN);
+    Double beadsArea = Double.valueOf(is.area);
+    if (beadsArea.doubleValue() == 0.0D) return output; 
+    Double beadsMeanIntensity = Double.valueOf(is.mean);
+    
+    ThresholdToSelection tts = new ThresholdToSelection();
+    Roi beadRoi = tts.convert(montage.getProcessor());
+    if (mjd.debugMode){
+        if (beadRoi==null)IJ.log("(in doCheck>computeRatios) beadRoi is null");
+         rm.addRoi(beadRoi);
+         rm.rename(rm.getCount()-1, "beads");
+    }
+    montage.getProcessor().fill(beadRoi);
+    montage.getProcessor().resetThreshold();
+       
+    ShapeRoi s1 = new ShapeRoi(beadRoi);
+    RoiEnlarger re = new RoiEnlarger();
+    Roi enlargedBeads=null;
+    double radius=2*pix;
+    do {
+        radius/=2;
+        if (mjd.debugMode)IJ.log("(in doCheck>computeRatios) radius "+radius);
+        ShapeRoi s2 = new ShapeRoi(RoiEnlarger.enlarge(beadRoi, radius));
+        enlargedBeads=s2.shapeToRoi();
+    }
+    while (enlargedBeads==null);
+    
+    if (mjd.debugMode){
+        if (enlargedBeads==null)IJ.log("(in doCheck>computeRatios) enlargedBeads is null");
+        rm.addRoi(enlargedBeads);
+        rm.rename(rm.getCount()-1, "enlarged beads");
+    }
+    Double anuliArea=Double.NaN;
+    Double anuliMeanIntensity=Double.NaN;
+    Double anuliIntensity=Double.NaN;
+    
+    if (enlargedBeads!=null){
+        Roi invertedEnlargedBeads=enlargedBeads.getInverse(montage);
+        if (mjd.debugMode){
+            rm.addRoi(invertedEnlargedBeads);
+            rm.rename(rm.getCount()-1, "inverted enlarged beads");
+        }
+        montage.getProcessor().fill(invertedEnlargedBeads);
+        montage.getProcessor().resetThreshold();
+        montage.getProcessor().setThreshold(1.0D, montage.getProcessor().getMax(), 0);
+        is = montage.getStatistics(Measurements.LIMIT+Measurements.AREA+Measurements.MEAN);
+        anuliArea = is.area;
+        anuliMeanIntensity = is.mean;
+        anuliIntensity=is.mean*is.area;
+        montage.getProcessor().resetThreshold();
     } 
-    montage.close();
-    if (anuliIntensity > 0.0D && beadsArea.doubleValue() > 0.0D && anuliArea > 0.0D)
-      output[1] = (beadsIntensity.doubleValue() / beadsArea.doubleValue()) / (anuliIntensity / anuliArea); 
+    
+    if (!mjd.debugMode) {
+        rm.close();
+        montage.close();
+    }
+    
+    if (enlargedBeads!=null||(anuliIntensity > 0.0D && beadsArea.doubleValue() > 0.0D && anuliArea > 0.0D)) output[1] = beadsMeanIntensity/anuliMeanIntensity;
     output[0] = saturatedArea / beadsArea.doubleValue();
+    if (mjd.debugMode)IJ.log("(in doCheck>computeRatios) cal.pixelWidth after cal reset"+cal.pixelWidth);
+    output[2]=radius*cal.pixelWidth;
     return output;
   }
   
