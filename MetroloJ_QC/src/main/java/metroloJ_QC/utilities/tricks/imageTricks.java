@@ -6,16 +6,22 @@ import ij.gui.NewImage;
 import ij.gui.Overlay;
 import ij.gui.Roi;
 import ij.IJ;
+import ij.plugin.RoiScaler;
+import ij.gui.TextRoi;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
 import ij.plugin.ChannelSplitter;
 import ij.plugin.Duplicator;
+import ij.plugin.ZProjector;
 import ij.plugin.frame.RoiManager;
 import ij.process.ImageProcessor;
 import ij.process.LUT;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.image.ColorModel;
+import java.util.List;
+import metroloJ_QC.coalignement.coAlignement;
+import metroloJ_QC.resolution.PSFprofiler;
 import metroloJ_QC.setup.metroloJDialog;
 
 public class imageTricks {
@@ -42,6 +48,10 @@ public class imageTricks {
   public static final int C = 1;
   
   public static final int T = 2;
+  
+  public static final int JUSTIFICATION_RIGHT=0;
+  
+  public static final int JUSTIFICATION_LEFT=1;
   
   public static void convertCalibration() {
     ImagePlus ip = WindowManager.getCurrentImage();
@@ -216,13 +226,49 @@ public class imageTricks {
     fontSize = 12;
   }
   
-  public static void addCross(ImageProcessor ip, int[] coord, int radius) {
-    ip.setColor(Color.white);
-    ip.setLineWidth(Math.max(2, Math.max(ip.getWidth(), ip.getHeight()) / 500));
-    ip.multiply(0.5D);
-    ip.drawLine(coord[0], coord[1] - radius, coord[0], coord[1] + radius);
-    ip.drawLine(coord[0] - radius, coord[1], coord[0] + radius, coord[1]);
+  public static void addCross(ImageProcessor proc, int[] coord, int radius) {
+    proc.setColor(Color.white);
+    proc.setLineWidth(Math.max(2, Math.max(proc.getWidth(), proc.getHeight()) / 500));
+    proc.multiply(0.5D);
+    proc.drawLine(coord[0], coord[1] - radius, coord[0], coord[1] + radius);
+    proc.drawLine(coord[0] - radius, coord[1], coord[0] + radius, coord[1]);
   }
+  
+  public static void addCrossAndRoi(ImageProcessor proc, int[] coord, int radius, Roi roi){
+    proc.resetRoi();
+    proc.multiply(0.5D);
+    proc.setColor(Color.white);
+    proc.setLineWidth(Math.max(2, Math.max(proc.getWidth(), proc.getHeight()) / 500));
+    proc.drawLine(coord[0], coord[1] - radius, coord[0], coord[1] + radius);
+    proc.drawLine(coord[0] - radius, coord[1], coord[0] + radius, coord[1]);
+    proc.draw(roi);
+  }
+  public static void addRoi (ImagePlus []ips, Roi [] Rois, double [] ratios, Color color){
+      for (int n=0; n<ips.length; n++) addRoi (ips[n].getChannelProcessor(), Rois[n], ratios[n], color);
+  }
+  
+  public static ImagePlus addRoi (ImagePlus image, int roiID, Color color){
+       ImagePlus output = (new Duplicator()).run(image, 1, image.getNChannels(), 1, image.getNSlices(), 1, image.getNFrames());
+       RoiManager rm=RoiManager.getRoiManager();
+       Overlay selected = new Overlay();
+       selected.add(rm.getRoi(roiID));
+       output.setOverlay(selected);
+       selected.drawNames(false);
+       selected.setStrokeColor(color);
+       output = output.flatten();
+       return output;
+  }
+  public static void addRoi(ImageProcessor proc, Roi roi, double ratio, Color color ){
+      if (roi==null) return;
+      proc.resetRoi();
+      Roi temp;
+      if (ratio!=1) temp=RoiScaler.scale(roi, 1, ratio, false);
+      else temp=roi;
+      proc.setColor(color);
+      proc.draw(temp);
+  }
+
+
   
   public static void applyFire(ImageProcessor ip) {
     int[] red = { 
@@ -318,9 +364,9 @@ public class imageTricks {
     ip.setColorModel((ColorModel)lut);
   }
   
-  public static ImagePlus cropROI(ImagePlus ip, double[] coordinates, String path, double box) {
+  public static ImagePlus cropROI(ImagePlus ip, double[] coordinates, String path, double calibratedHalfBox) {
     Calibration cal = ip.getCalibration();
-    double boxInPixels = dataTricks.round(box / cal.pixelHeight, 0);
+    double boxInPixels = 2*dataTricks.round(calibratedHalfBox / cal.pixelHeight, 0);
     Roi roi = new Roi(coordinates[0] - dataTricks.round(boxInPixels / 2.0D, 0), coordinates[1] - dataTricks.round(boxInPixels / 2.0D, 0), boxInPixels, boxInPixels);
     RoiManager rm = RoiManager.getRoiManager();
     rm.addRoi(roi);
@@ -390,98 +436,162 @@ public class imageTricks {
     return reSizedRoiImage;
   }
   
-  public static void showROIs(ImagePlus image, Double[][] coordinates, metroloJDialog mjd, String path) {
-    Calibration cal = image.getCalibration();
-    ImagePlus overlaidImage = (new Duplicator()).run(image, 1, image.getNChannels(), 1, image.getNSlices(), 1, image.getNFrames());
-    overlaidImage.setLut(LUT.createLutFromColor(Color.white));
-    Overlay selected = new Overlay();
-    double boxInPixels = dataTricks.round(mjd.beadSize * mjd.cropFactor / cal.pixelHeight, 0);
-    int counter = 0;
-    for (int k = 0; k < coordinates.length; k++) {
-      Roi roi = new Roi(coordinates[k][0] - dataTricks.round(boxInPixels / 2.0D, 0), coordinates[k][1] - dataTricks.round(boxInPixels / 2.0D, 0), boxInPixels, boxInPixels);
-      switch (coordinates[k][3].intValue()) {
-        case 0:
-          selected.add(roi, "" + counter);
-          counter++;
-          break;
-      } 
-    } 
-    overlaidImage.setOverlay(selected);
-    selected.drawNames(true);
-    int size = (int)dataTricks.round(mjd.cropFactor * mjd.beadSize / 10.0D * cal.pixelWidth, 0);
-    selected.setLabelFontSize(size, "");
-    selected.setStrokeColor(Color.green);
-    selected.setLabelColor(Color.green);
-    overlaidImage = overlaidImage.flatten();
-    
-    Overlay tooClose = new Overlay();
-    for (int j = 0; j < coordinates.length; j++) {
-      Roi roi = new Roi(coordinates[j][0] - dataTricks.round(boxInPixels / 2.0D, 0), coordinates[j][1] - dataTricks.round(boxInPixels / 2.0D, 0), boxInPixels, boxInPixels);
-      switch (coordinates[j][3].intValue()) {
-        case 1:
-          tooClose.add(roi);
-          break;
-      } 
-    } 
-    selected.clear();
-    overlaidImage.setOverlay(tooClose);
-    tooClose.setStrokeColor(Color.yellow);
-    overlaidImage = overlaidImage.flatten();
-    
-    Overlay toTheEdge = new Overlay();
-    for (int i = 0; i < coordinates.length; i++) {
-      Roi roi = new Roi(coordinates[i][0] - dataTricks.round(boxInPixels / 2.0D, 0), coordinates[i][1] - dataTricks.round(boxInPixels / 2.0D, 0), boxInPixels, boxInPixels);
-      switch (coordinates[i][3].intValue()) {
-        case 2:
-          toTheEdge.add(roi);
-          break;
-      } 
-    } 
-    tooClose.clear();
-    overlaidImage.setOverlay(toTheEdge);
-    toTheEdge.setStrokeColor(Color.cyan);
-    overlaidImage = overlaidImage.flatten();
-    
-    Overlay toTheTopBottom = new Overlay();
-    for (int i = 0; i < coordinates.length; i++) {
-      Roi roi = new Roi(coordinates[i][0] - dataTricks.round(boxInPixels / 2.0D, 0), coordinates[i][1] - dataTricks.round(boxInPixels / 2.0D, 0), boxInPixels, boxInPixels);
-      switch (coordinates[i][3].intValue()) {
-        case 3:
-          toTheTopBottom.add(roi);
-          break;
-      } 
-    } 
-    toTheEdge.clear();
-    overlaidImage.setOverlay(toTheTopBottom);
-    toTheTopBottom.setStrokeColor(Color.MAGENTA);
-    overlaidImage = overlaidImage.flatten();
-    
-    Overlay toTheEdgeTopBottom = new Overlay();
-    for (int i = 0; i < coordinates.length; i++) {
-      Roi roi = new Roi(coordinates[i][0] - dataTricks.round(boxInPixels / 2.0D, 0), coordinates[i][1] - dataTricks.round(boxInPixels / 2.0D, 0), boxInPixels, boxInPixels);
-      switch (coordinates[i][3].intValue()) {
-        case 4:
-          toTheEdgeTopBottom.add(roi);
-          break;
-      } 
-    } 
-    toTheTopBottom.clear();
-    overlaidImage.setOverlay(toTheEdgeTopBottom);
-    toTheEdgeTopBottom.setStrokeColor(Color.WHITE);
-    overlaidImage = overlaidImage.flatten();
-    
-    double width = mjd.beadSize * mjd.cropFactor;
-    addScaleBar(overlaidImage.getProcessor(), cal, 0, (int)width);
-    FileSaver fs = new FileSaver(overlaidImage);
-    fs.saveAsJpeg(path + "beadOverlay.jpg");
-  }
+  
   
   public static void setCalibrationToPixels(ImagePlus image) {
     Calibration calib = image.getCalibration();
     calib.setXUnit("pixels");
     calib.setYUnit("pixels");
+    calib.setZUnit("pixels");
     calib.pixelWidth = 1.0D;
     calib.pixelHeight = 1.0D;
+    calib.pixelDepth = 1.0D;
     image.setCalibration(calib);
+  }
+
+  public static ImagePlus StampResultsMultipleBeadsMode(ImagePlus input, int firstResult, List<Double[]> beadsCoordinates,List<String> beadsFeatures, metroloJDialog mjd, int justification) {
+    ImagePlus output;
+    Calibration cal = input.getCalibration();
+    int fontType = Font.PLAIN;
+    int fontSize = (int)Math.max(10,dataTricks.round(((mjd.cropFactor * mjd.beadSize) / 10.0D) * cal.pixelWidth, 0));
+    Font font; 
+    double x=input.getWidth();
+    double y=input.getHeight();
+    font = new Font("Arial", fontType, fontSize);
+    if(mjd.debugMode)IJ.log("(in ImageTricks>StampResultsMultipleBeadsMode) first valid text:"+beadsFeatures.get(firstResult));
+    TextRoi label=getTextRoi(beadsFeatures.get(firstResult),x, 0.0D, font, justification);
+    if (mjd.debugMode&&label==null)IJ.log("(in ImageTricks>StampResultsMultipleBeadsMode) no valid textRoi generated");
+    
+    int textShift=10;
+    int [] padSize={(int)label.getFloatWidth()+textShift,(int)label.getFloatHeight()+textShift};
+    ImagePlus temp=padImage(input, padSize);
+    
+    String outputTitle="annotated overlay";
+    Overlay textOverlay=new Overlay();
+    for (int n=0; n<beadsCoordinates.size(); n++) {
+        double calibratedBox=Math.max(mjd.beadSize * mjd.cropFactor, (mjd.beadSize + 2*(mjd.anulusThickness+mjd.innerAnulusEdgeDistanceToBead)*1.1D));
+        double boxInPixels = dataTricks.round(calibratedBox / cal.pixelHeight, 0);
+        if (justification==JUSTIFICATION_RIGHT) {
+            x= beadsCoordinates.get(n)[0]+padSize[0]-dataTricks.round(boxInPixels / 2.0D, 0)- textShift;
+        }
+        else {
+            x= beadsCoordinates.get(n)[0]+padSize[0]+dataTricks.round(boxInPixels / 2.0D, 0)+ textShift;
+        }
+        y= beadsCoordinates.get(n)[1]+padSize[1]-dataTricks.round(boxInPixels / 2.0D, 0);
+        label=getTextRoi(beadsFeatures.get(n),x, y, font, justification);
+        if (mjd.debugMode)IJ.log("(in ImageTricks>StampResultsMultipleBeadsMode) bead"+n+"padSize X: "+padSize[0]+", padSize Y: "+padSize[1]+", original coords: "+beadsCoordinates.get(n)+", "+beadsCoordinates.get(n)[1]+" & label coordinates: "+x+", "+y);
+        textOverlay.add(label);
+    }
+    temp.setOverlay(textOverlay);
+    textOverlay.setStrokeColor(Color.WHITE);
+    output = temp.flatten();
+    temp.close();
+    output.setTitle(outputTitle);
+    output.setCalibration(cal);
+    if (mjd.debugMode) output.show();
+    return (output);
+  }
+
+            
+    /**    x= output.getWidth()- textShift;
+        y= textShift;
+        size=18;
+    */
+  public static ImagePlus StampResultsSingleBeadMode(ImagePlus input, String features, int justification) {
+    Calibration cal = input.getCalibration();
+    ImagePlus output;
+    int fontType = Font.PLAIN;
+    int fontSize = (int)Math.max(10, dataTricks.round((input.getHeight() / 10.0D) * cal.pixelWidth, 0));
+    
+    Font font; 
+    double x=input.getWidth();
+    double y=input.getHeight();
+    font = new Font("Arial", fontType, fontSize); 
+    TextRoi label=getTextRoi(features,x, 0.0D, font, justification);
+    int textShift=10;
+    int [] padSize={(int)label.getFloatWidth()+textShift,(int)label.getFloatHeight()+textShift};
+    ImagePlus temp=padImage(input, padSize);
+    
+    String outputTitle="annotated overlay";
+    Overlay textOverlay=new Overlay();
+    x= temp.getWidth()- textShift;
+    y= textShift;
+    label=getTextRoi(features,x, y, font, justification);
+    textOverlay.add(label);
+    temp.setOverlay(textOverlay);
+    textOverlay.setStrokeColor(Color.WHITE);
+    output = temp.flatten();
+    temp.close();
+    output.setCalibration(cal);
+    output.setTitle(outputTitle);
+    return (output);
+  }
+
+    public static int findFirstCOAResult(List<coAlignement> beadsCoas){
+        int output=-1;
+        for (int n=0; n<beadsCoas.size(); n++){
+            if (beadsCoas.get(n).result)return(n);   
+        }
+      return(output);
+    }
+      public static int findFirstPPResult(List<PSFprofiler> beadsPPs){
+        int output=-1;
+        for (int n=0; n<beadsPPs.size(); n++){
+            if (beadsPPs.get(n).result)return(n);   
+        }
+      return(output);
+    }
+      
+    private static TextRoi getTextRoi(String features,double x, double y, Font font, int justification){
+        TextRoi output= new TextRoi(features, x, y, font);
+        if (justification==JUSTIFICATION_RIGHT) output.setJustification(TextRoi.RIGHT);
+        else output.setJustification(TextRoi.LEFT);
+        output.setStrokeColor(Color.white);
+        output.setDrawStringMode(true);
+        return output;
+    }
+  
+    private static ImagePlus padImage(ImagePlus image, int[] pad){
+        ImagePlus output;
+        int width = image.getWidth()+(2*pad[0]);
+        int height = image.getHeight()+(2*pad[1]); 
+
+	ImageProcessor iproc = image.getProcessor().createProcessor(width , height);
+        iproc.setColor(Color.BLACK);
+        iproc.fill();
+        iproc.insert(image.getProcessor(), pad[0], pad[1]);
+        ImagePlus temp=new ImagePlus ("annotated overlay", iproc);
+        Overlay outlines=new Overlay();
+        Roi edges=Roi.create(pad[0], pad[1], image.getWidth(), image.getHeight());
+        outlines.add(edges);
+        outlines.setStrokeColor(Color.cyan);
+        temp.setOverlay(outlines);
+        output=temp.flatten();
+        temp.close();
+	return output;
+      
+  }
+    public static void saveImage(ImagePlus image, String path, String suffix){
+        path+=suffix;
+        FileSaver fs = new FileSaver(image);
+        fs.saveAsJpeg(path);
+    }
+    
+    public static ImagePlus getBestProjection(ImagePlus input, boolean debugMode) {
+    Calibration cal = input.getCalibration();
+    ImagePlus [] image=ChannelSplitter.split(input);
+    ImagePlus [] projs= new ImagePlus [image.length];
+    int bestChannel=-1;
+    int max=0;
+    for (int channel=0; channel<image.length; channel++){
+        ZProjector zp = new ZProjector(image[channel]);
+        zp.setMethod(1);
+        zp.doProjection();
+        projs[channel] = zp.getProjection();
+        double temp=projs[channel].getProcessor().getMax();
+        if (temp>max) bestChannel=channel;
+    }
+    projs[bestChannel].setCalibration(cal);
+    return projs[bestChannel];
   }
 }

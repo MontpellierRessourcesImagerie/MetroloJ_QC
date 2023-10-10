@@ -9,37 +9,31 @@ import metroloJ_QC.reportGenerators.QC_Generate_PSFReport;
 import metroloJ_QC.reportGenerators.QC_Generate_FieldIlluminationReport;
 import ij.*;
 import ij.gui.*;
-import ij.io.Opener;
 import ij.plugin.*;
-import ij.macro.*;
 import ij.ImagePlus;
-import org.scijava.Context;
-import org.scijava.script.ScriptService;
 import java.awt.*;
-import java.awt.dnd.*;
 import java.awt.event.*;
-import java.awt.datatransfer.*;
 import java.io.*;
-import java.net.MalformedURLException;
 import java.net.URL;
-import javax.script.ScriptException;
 import javax.swing.*;
 import javax.swing.plaf.metal.*;
-import java.util.*;
 import java.lang.Runnable;
-import java.lang.Thread;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
-import metroloJ_QC.utilities.tricks.fileTricks;
-import metroloJ_QC.setup.metroloJDialog;
+import metroloJ_QC.reportGenerators.QC_Generate_Tests;
 
 
 public class MetroloJ_QC_ implements PlugIn, ActionListener, Runnable {
-    boolean debug=false;
+    public static final String VERSION="1.2.8";
+    public static final String ImageJVERSION="1.53e";
+    boolean debugMode=Prefs.get("General_debugMode.boolean", false); 
+    boolean scrollBarsOptions=Prefs.get("General_scrollBars.boolean", true);
+    boolean HideInfoAndComments=Prefs.get("MetroloJDialog_HideInfoAndComments.boolean", true);
+    boolean showDebugOptions=true;
     boolean FI=Prefs.get("QCbarFI.boolean", true);
     boolean batch=Prefs.get("QCbarBatch.boolean", true);
     boolean PP=Prefs.get("QCbarPP.boolean", true);
@@ -47,9 +41,10 @@ public class MetroloJ_QC_ implements PlugIn, ActionListener, Runnable {
     boolean ZP=Prefs.get("QCbarZP.boolean", true);
     boolean CAM=Prefs.get("QCbarCAM.boolean", true); 
     boolean CV=Prefs.get("QCbarCV.boolean", true); 
-    boolean POS=Prefs.get("QCbarPos.boolean", true); 
+    boolean POS=Prefs.get("QCbarPos.boolean", true);
+    boolean TEST=false;
     String name, path;
-    String title="MetroloJ_QC v"+metroloJDialog.VERSION;
+    String title="MetroloJ_QC v"+VERSION;
     String separator = System.getProperty("file.separator");
     JFrame frame;
     Frame frontframe;
@@ -60,7 +55,7 @@ public class MetroloJ_QC_ implements PlugIn, ActionListener, Runnable {
     int hfw = 0;
 
     // buttons of a given toolbar/line
-    JButton [] buttons = new JButton[15];
+    JButton [] buttons = new JButton[16];
     int nButtonsSingleMode;
     int nButtonsBatchMode;
     boolean tbOpenned = false;
@@ -80,8 +75,12 @@ public class MetroloJ_QC_ implements PlugIn, ActionListener, Runnable {
 public void run(String s) {
     // s used if called from another plugin, or from an installed command.
     // arg used when called from a run("command", arg) macro function
+    TEST=showDebugOptions;
+    String temp=Prefs.get("General_version.String", "");
+    Prefs.set("General_version.String", VERSION);
+    Prefs.set("General_ImageJversion.String", ImageJVERSION);
     Prefs.set("General_debugMode.boolean", false);
-    Prefs.set("General_debugMode.boolean", debug);
+    Prefs.set("General_debugMode.boolean", showDebugOptions);
     frame=new JFrame();
     bgColor=presetColors[0];
     frame.setBackground(bgColor);
@@ -150,7 +149,10 @@ public void run(String s) {
                                 break;   
                             case "QC_Generate_batchCoAlignementReport":
                                 buttonsContent[j].setEnabled(COA&&batch);
-                                break;       
+                                break;
+                            case "QC_Generate_Test_Reports":
+                                buttonsContent[j].setEnabled(TEST);
+                                break;
                         }
                     }
                 }
@@ -249,26 +251,34 @@ private void designButtons(int i) {
         buttons[11] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
         buttons[11].setVisible(true);
 
-        altLabel="Configure bar";
+         altLabel="Test & Debug";
+        fullLabel="Test & Debug";
+        icon="test.png";
+        arg="Test";
+        buttons[12] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[12].setVisible(true);
+        if (!showDebugOptions) buttons[12].setVisible(false);
+        
+        altLabel="Configuration";
         fullLabel="Configure";
         icon="config.png";
         arg="Configure";
-        buttons[12] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
-        buttons[12].setVisible(true);
+        buttons[13] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[13].setVisible(true);
         
         altLabel="Open manual";
         fullLabel="Open manual";
         icon="manual.png";
         arg="Manual";
-        buttons[13] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
-        buttons[13].setVisible(true);
+        buttons[14] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[14].setVisible(true);
         
         altLabel="About MetroloJ_QC";
         fullLabel="About MetroloJ_QC";
         icon="about.png";
         arg="About";
-        buttons[14] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
-        buttons[14].setVisible(true);
+        buttons[15] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[15].setVisible(true);
         
     }
     private void designPanel() {
@@ -344,9 +354,10 @@ private void designButtons(int i) {
         toolBar[2]=new JToolBar();
         toolBar[2].add(buttons[10]);
         toolBar[2].add(buttons[11]);
-        toolBar[2].add(buttons[12]);
+        if (showDebugOptions) toolBar[2].add(buttons[12]);
         toolBar[2].add(buttons[13]);
         toolBar[2].add(buttons[14]);
+        toolBar[2].add(buttons[15]);
         addBarLine(toolBar[2], 5);
     }
 
@@ -430,6 +441,10 @@ private void designButtons(int i) {
             case "Hide" :
                 toggleIJ();
                 break;
+            case "Test" :
+                QC_Generate_Tests gt=new QC_Generate_Tests();
+                gt.run("");
+                break;    
             case "Configure" :
                 configureQCBar();
                 break;
@@ -519,6 +534,10 @@ private void designButtons(int i) {
         gd.addCheckbox("Camera (uses either minimal or long exposures closed shutter acquisitions)", CAM);
         gd.addMessage("Stage tools");
         gd.addCheckbox("Position (uses timelapses of 1 um beads) Not available yet", POS);
+        gd.addMessage("MetroloJ_QC dialogs configuration");
+        gd.addCheckbox("Hide information/comments fields", HideInfoAndComments);
+        gd.addCheckbox("Use scrollBars windows", scrollBarsOptions);
+        gd.addCheckbox("Show the debug options", debugMode);
         gd.hideCancelButton();
         gd.showDialog();
         
@@ -530,7 +549,9 @@ private void designButtons(int i) {
         CV=gd.getNextBoolean();
         CAM=gd.getNextBoolean();
         POS=gd.getNextBoolean();
-        
+        HideInfoAndComments=gd.getNextBoolean();
+        scrollBarsOptions=gd.getNextBoolean();
+        debugMode=gd.getNextBoolean();
         Prefs.set("QCbarPP.boolean", PP);
         Prefs.set("QCbarFI.boolean", FI);
         Prefs.set("QCbarBatch.boolean", batch);
@@ -539,6 +560,9 @@ private void designButtons(int i) {
         Prefs.set("QCbarCAM.boolean", CAM); 
         Prefs.set("QCbarCV.boolean", CV);
         Prefs.set("QCbarPOS.boolean", CV);
+        Prefs.set("MetroloJDialog_HideInfoAndComments.boolean",HideInfoAndComments);
+        Prefs.set("General_scrollBars.boolean",scrollBarsOptions);
+        Prefs.set("General_debugMode.boolean",debugMode);
 	frame.dispose();
         for (int i=frame.getContentPane().getComponentCount()-1; i>-1; i--)frame.getContentPane().remove(i);
         frame.getContentPane().doLayout();
@@ -616,9 +640,9 @@ private void designButtons(int i) {
 
 
         gd.addMessage("MetroloJ_QC is a branch of the initial MetroloJ plugin designed\nby Fabrice Cordelieres and Cedric Matthews");
-        gd.addMessage("QC contributors : Leslie Bancel-Vallée, Julien Cau, Orestis Faklaris,\nThomas Guilbert, Baptiste Monterroso");gd.addMessage("Version: " + metroloJDialog.VERSION);
+        gd.addMessage("QC contributors : Leslie Bancel-Vallée, Julien Cau, Orestis Faklaris,\nThomas Guilbert, Baptiste Monterroso");gd.addMessage("Version: " + VERSION);
         gd.addMessage("Uses iText and BioFormats plugins\nRequires ImageJ 1.53g and more");
-        gd.addMessage("MetroloJ_QC v"+metroloJDialog.VERSION +" was tested with ImageJ 1.53g and Java 14.0.2,\niText 5.5.13.2 and bioformats 6.6.1");
+        gd.addMessage("MetroloJ_QC v"+VERSION +" was tested with ImageJ 1.53g and Java 14.0.2,\niText 5.5.13.2 and bioformats 6.6.1");
 
         Panel p = new Panel(new FlowLayout());
         Button iText = new Button("Get iText");

@@ -1,16 +1,15 @@
 package metroloJ_QC.importer;
 
 import ij.IJ;
+import ij.ImagePlus;
 import java.io.File;
 import java.io.IOException;
-import java.security.Timestamp;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.nio.file.Files;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import loci.formats.FilePattern;
@@ -20,7 +19,6 @@ import loci.formats.MetadataTools;
 import loci.formats.meta.IMetadata;
 import loci.plugins.LociImporter;
 import loci.plugins.util.ImageProcessorReader;
-import metroloJ_QC.utilities.tricks.fileTricks;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
@@ -32,7 +30,11 @@ public class importer {
   public importer(String path, boolean choice) {
     this.filesToOpen = scanFiles(path, choice);
   }
-  
+  /** retrieves the file list of all bioformats compatible files
+   * @param path : the folder's path were all files are stored
+   * @param group whether series of images should be opened as a single image
+   * @return the list of all bioformats compatible image's paths
+   */
   public ArrayList<String> scanFiles(String path, boolean group) {
     HashSet<String> done = new HashSet();
     ArrayList<String> list = new ArrayList();
@@ -79,22 +81,58 @@ public class importer {
     } 
   }
   
-  public String openImage(int n, boolean group, boolean open, boolean debugMode) {
+  /**
+   * retrieves the image creation information of an image of the fileToOpen list and opens the image (if requested) 
+   * @param n the ID within the importer's filesToOpen list variable
+   * @param group whether series of images should be opened as a single image
+   * @param open whether the image should be opened or not (use false if just willing to get the creation information
+   * @param debugMode : when true, shows debug actions (eg. logs, intermediate images, etc...)
+   * @return a String array containing the image's creation date [0] (or "unknown" if not retrieved) 
+   * and the method that was used to retrieve this information [1] such as "from metadata" of "from file creation date" or 
+   * "original file info & metadata could not be found" if none worked
+   */
+  public String [] openImage(int n, boolean group, boolean open, boolean debugMode) {
+    String [] output;
+    ImagePlus image=null;
     String id = this.filesToOpen.get(n);
     if (debugMode)IJ.log("(in importer>openImage) image name "+id+",\ngroup files "+ group+", open file "+open);
-    String output="";
     output=getMetaData(id, debugMode);
     if (debugMode)IJ.log("(in importer>openImage) image creation date "+output);
     if (open) {
         String params = "location=[Local machine] windowless=true groupFiles=" + group + " open=[" + id + "] ";
         (new LociImporter()).run(params);
         IJ.showStatus("");
+        
     }
+    if (output[0].isEmpty()) {
+        try {         
+            File file = new File(id);
+            BasicFileAttributes attrs;
+            attrs = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
+            Date date = new Date(attrs.creationTime().toMillis() );
+            String pattern = "yyyy-MM-dd HH:mm:ss";
+            SimpleDateFormat simpleDateFormat = new SimpleDateFormat(pattern);
+            output[0]=simpleDateFormat.format(date);
+            output[1]="from file creation date";
+        } catch (IOException ex) {
+                Logger.getLogger(importer.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    if (output[0].isEmpty()){
+        output[0]="unknown";
+        output[1]="original file info & metadata could not be found" ;
+    }    
     return(output);
   }
   
-  public static String getMetaData(String id, boolean debugMode) {
-	String output="";
+   /**
+   * retrieves the image creation information of an image
+   * @param id the image's path
+   * @param debugMode : when true, shows debug actions (eg. logs, intermediate images, etc...)
+   * @return a String array containing the image's creation date,as read from metadata [0] and "from metadata"  if this information was retrieved and "" if not 
+   */
+  public static String [] getMetaData(String id, boolean debugMode) {
+	String [] output={"",""};
         ImageProcessorReader reader = new ImageProcessorReader();
 	IMetadata omeMeta = MetadataTools.createOMEXMLMetadata();
 	reader.setMetadataStore(omeMeta);
@@ -107,8 +145,8 @@ public class importer {
                 DateTime dt=ts.asDateTime(DateTimeZone.getDefault());
                 String pattern = "yyyy-MM-dd hh:mm:ss";
                 DateTimeFormatter formatter = DateTimeFormat.forPattern(pattern);
-                output = formatter.print(dt);
-                output+=" (from Metadata)";
+                output [0] = formatter.print(dt);
+                output [1]="from Metadata";
             }
       } catch (FormatException ex) {
           Logger.getLogger(importer.class.getName()).log(Level.SEVERE, null, ex);
@@ -118,6 +156,7 @@ public class importer {
 	return (output);
 }
   
+  /*
   public List<int[]> group(String objectiveTag, String[] channelTags) {
     List<int[]> tags = (List)new ArrayList();
     for (int i = 0; i < this.filesToOpen.size(); i++) {
@@ -146,4 +185,5 @@ public class importer {
     } 
     return tags;
   }
+*/
 }

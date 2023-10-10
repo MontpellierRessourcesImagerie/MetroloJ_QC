@@ -1,31 +1,37 @@
 package metroloJ_QC.resolution;
 
-public class resolutionCalculator {
-  public final int WIDEFIELD = 0;
-  
-  public final int CONFOCAL = 1;
-  
-  public final int SPINNING = 2;
-  
-  public final int MULTIPHOTON = 3;
-  
-  double[] resolution;
-  
-  double[] nyquist;
-  
-  int X;
-  
-  int Y;
-  
-  int Z;
-  
-  public resolutionCalculator(int type, double emWavelength, double exWavelength, double NA, double refractiveIndex, Double pinhole) {
+public class theoreticalValuesCalculator {
+ // final variables used to specify the microscope type 
+ public final int WIDEFIELD = 0;
+ public final int CONFOCAL = 1;
+ public final int SPINNING = 2;
+ public final int MULTIPHOTON = 3;
+ public final int X=0;
+ public final int Y=1;
+ public final int Z=2;
+ 
+ // a variable that stores in an array, the theoretical resolution values
+double[] resolution;
+// a variable that stores in an array, the theoretical optimal voxel size (following
+// shannon-nyquist criterion)
+double[] nyquist;
+
+  /**
+   * computes the resolution value and the voxel size according to shannon-nyquist criterion 
+   * @param type: the microscope type
+   * @param emWavelength: the emission wavelength used
+   * @param exWavelength: the excitation wavelength used
+   * @param NA: the numerical aperture of the lens used
+   * @param refractiveIndex: the refractive index of the immersion medium of the lens that is used
+   * @param pinhole: when relevant, the pinhole size
+   * The method calculates the theoretical resolution in X, Y and Z directions (stored as a 
+   * double array into the resolution class variable. It also computs the optimal voxel size*
+   * that follows the shannon-nyquist criterion and stores the X,Y, Z sizes in the nyquist class variable as a double array
+   */
+  public theoreticalValuesCalculator(int type, double emWavelength, double exWavelength, double NA, double refractiveIndex, Double pinhole) {
     double meanWavelength;
     this.resolution = new double[] { 0.0D, 0.0D, 0.0D };
     this.nyquist = new double[] { 0.0D, 0.0D, 0.0D };
-    this.X = 0;
-    this.Y = 1;
-    this.Z = 2;
     emWavelength /= 1000.0D;
     exWavelength /= 1000.0D;
     switch (type) {

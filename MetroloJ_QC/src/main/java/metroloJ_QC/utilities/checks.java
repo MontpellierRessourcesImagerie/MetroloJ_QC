@@ -6,10 +6,9 @@
 package metroloJ_QC.utilities;
 
 /**
- *
- * @author Julien Cau
+ * this class is used to code various checks that are performed in MetroloJ_QC
  */
-public class check {
+public class checks {
     public static final int VERSION_UP_TO_DATE = 1;
     public static final int IS_ZSTACK = 2;
     public static final int IS_TSTACK = 4;

@@ -19,25 +19,45 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import metroloJ_QC.importer.simpleMetaData;
 import metroloJ_QC.report.utilities.content;
+import metroloJ_QC.setup.metroloJDialog;
 import metroloJ_QC.setup.microscope;
 import metroloJ_QC.utilities.doCheck;
-import metroloJ_QC.utilities.proj2D;
+import metroloJ_QC.utilities.ROIProjectionProfile;
 import metroloJ_QC.utilities.tricks.dataTricks;
 import metroloJ_QC.utilities.tricks.imageTricks;
 
 public class zProfiler {
-  public microscope micro;
-  
   public static final double SQRT2LN2 = Math.sqrt(2.0D * Math.log(2.0D));
+
+ // The original creation date of the image as a String array containing the image's creation date [0] (or "unknown" if not retrieved) 
+ // and the method that was used to retrieve this information [1]
+ // This is quite useful is the analysed image is a subset of the original image
+  String [] creationInfo;
   
+  // stores all dialog/algorithm analysis parameters
+  public metroloJDialog mjd;
+  
+  // stores the image used in the algorithm (either an original or a cropped, single-bead containing subset of 
+  // the original image
   public ImagePlus[] ip = null;
   
+  // stores all microscope-related parameters
+  public microscope micro;
+
+  // stores saturated pixel proportions in a [channel] array (from 0, no saturated pixels found to 1 when all pixels are saturated
+  public double[] saturation;
+  
+  // stores the ROI's used to generate the analysis (as derived from the report generator
   public Roi roi = null;
   
   public double[][] dist = null;
   
+// [channel] array of average intensities across the ROI's width along the height of the ROI. rawProfile[0][234] 
+//  gives the average intensity of the 235th line of the ROI.  
   public double[][] rawProfile = null;
+  
   
   public double[][] fitProfile = null;
   
@@ -47,33 +67,35 @@ public class zProfiler {
   
   double[] resol;
   
-  public content[][] microSection;
+//  public content[][] microSection;
   
-  public double[] saturation;
-  
-  public zProfiler(ImagePlus image, Roi roi, microscope conditions, int fitChoice, String creationDate) {
-    this.roi = roi;
-    this.micro = conditions;
-    if ((image.getCalibration()).pixelDepth != conditions.cal.pixelDepth || (image.getCalibration()).pixelHeight != conditions.cal.pixelHeight || (image.getCalibration()).pixelWidth != conditions.cal.pixelWidth) {
-      this.micro.cal = image.getCalibration();
+
+  public zProfiler(metroloJDialog mjd) {
+    this.mjd=mjd.copy();
+    creationInfo=simpleMetaData.getOMECreationInfos(this.mjd.ip, this.mjd.debugMode);
+    this.roi = mjd.roi;
+    this.micro = mjd.createMicroscopeFromDialog();
+    if ((this.mjd.ip.getCalibration()).pixelDepth != this.micro.cal.pixelDepth || (this.mjd.ip.getCalibration()).pixelHeight != this.micro.cal.pixelHeight || (mjd.ip.getCalibration()).pixelWidth != this.micro.cal.pixelWidth) {
+      this.micro.cal = mjd.ip.getCalibration();
       this.micro.compileSamplingRatios();
     } 
-    this.ip = ChannelSplitter.split(image);
+    this.ip = ChannelSplitter.split(this.mjd.ip);
     if (this.ip.length != this.micro.emWavelengths.length)
       return; 
     initializeValues();
-    String name = image.getShortTitle();
+    String name = mjd.ip.getShortTitle();
     int i;
     for (i = 0; i < this.ip.length; ) {
       this.saturation[i] = doCheck.computeSaturationRatio(this.ip[i], false, this.micro.bitDepth);
       i++;
     } 
-    this.micro.getSpecs(name, this.saturation, creationDate);
-    this.microSection = this.micro.reportHeader;
+    this.micro.getMicroscopeInformationSummary(name, mjd, this.saturation, this.creationInfo, null);
+   // this.microSection = this.micro.microscopeInformationSummary;
     for (i = 0; i < this.ip.length; i++) {
-      double[] temp = (new proj2D()).doProj(this.ip[i], roi);
+      //generates a 1D average projection array across the ROI's height   
+      double[] temp = (new ROIProjectionProfile()).getROIProjectionProfile(this.ip[i], roi);
       this.rawProfile[i] = temp;
-      fitProfile(i, fitChoice);
+      fitProfile(i, mjd.fitChoice);
     } 
   }
   
@@ -112,7 +134,12 @@ public class zProfiler {
     this.resol[i] = 2.0D * SQRT2LN2 * this.params[i][3];
   }
   
-  public String getParams(int i) {
+    /**
+     * retrieves fitting parameters for a given channel
+     * @param i
+     * @return
+     */
+    public String getParams(int i) {
     return this.paramString[i];
   }
   
@@ -177,13 +204,13 @@ public class zProfiler {
     int rows = 1 + this.micro.emWavelengths.length;
     int cols = 3;
     content[][] output = new content[rows][cols];
-    output[0][0] = new content("Channel", 0);
-    output[0][1] = new content("FWHM", 0);
-    output[0][2] = new content("Theoretical resolution", 0);
+    output[0][0] = new content("Channel", content.TEXT);
+    output[0][1] = new content("FWHM", content.TEXT);
+    output[0][2] = new content("Theoretical resolution", content.TEXT);
     for (int i = 0; i < this.micro.emWavelengths.length; i++) {
-      output[1 + i][0] = new content("Channel " + i, 0);
-      output[1 + i][1] = new content("" + dataTricks.round(this.resol[i], 3) + " " + this.micro.cal.getUnit(), 0);
-      output[1 + i][2] = new content("" + dataTricks.round(((double[])this.micro.resolutions.get(i))[2], 3) + " " + IJ.micronSymbol+ "m", 0);
+      output[1 + i][0] = new content("Channel " + i, content.TEXT);
+      output[1 + i][1] = new content("" + dataTricks.round(this.resol[i], 3) + " " + this.micro.cal.getUnit(), content.TEXT);
+      output[1 + i][2] = new content("" + dataTricks.round(((double[])this.micro.resolutions.get(i))[2], 3) + " " + IJ.micronSymbol+ "m", content.TEXT);
     } 
     return output;
   }

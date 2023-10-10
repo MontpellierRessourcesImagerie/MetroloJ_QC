@@ -4,7 +4,6 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.Prefs;
 import ij.io.DirectoryChooser;
-import ij.measure.Calibration;
 import ij.plugin.Commands;
 import ij.plugin.PlugIn;
 import java.io.File;
@@ -14,52 +13,70 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import metroloJ_QC.coalignement.coAlignement;
 import metroloJ_QC.importer.importer;
-import metroloJ_QC.importer.simpleMetaData;
-import metroloJ_QC.report.warnings;
 import metroloJ_QC.report.batchCoAlignementReport;
 import metroloJ_QC.report.coAlignementReport;
 import metroloJ_QC.report.utilities.content;
 import metroloJ_QC.setup.metroloJDialog;
-import metroloJ_QC.setup.microscope;
-import metroloJ_QC.utilities.check;
+import metroloJ_QC.utilities.checks;
 import metroloJ_QC.utilities.doCheck;
-import metroloJ_QC.utilities.findBead;
-import metroloJ_QC.utilities.tricks.dataTricks;
+import metroloJ_QC.utilities.findBeads;
 import metroloJ_QC.utilities.tricks.fileTricks;
 import metroloJ_QC.utilities.tricks.imageTricks;
-
+  /**
+ * Executes the PSF report generation process using the currently opened and selected image.
+ * This function performs the following steps on a :
+ * - Performs some checks (such as for ImageJ version, existence of an input calibrated 3D Z stack)
+ * - Displays a dialog for generating the PSF report.
+ * - when relevant (multiple beads-containing image stack), identifies beads and 
+ * splits the input 3D Z stack into one single bead-containing substacks and saves them
+ * - Generates the PSFProfiler analyses on the whole image (single-bead input Z stack) or using
+ * each single-bead substack previously generated. Saves the associated results
+ * in a report if conditions are met.
+ * 
+ * @param arg Unused parameter.
+ */
 public class QC_Generate_batchCoAlignementReport implements PlugIn {
-  public String title = Prefs.get("BatchcoAlignementReport_title.string", "");
-  private static boolean debug=Prefs.get("General_debugMode.boolean", false);
+  // a final boolean to store whether debug mode is used 
+  private static final boolean debug=Prefs.get("General_debugMode.boolean", false);
+  
+  // the path were the reports should be saved
   public String path;
   
-  public microscope micro = null;
-  
+  // the metroloJDialog object storing all analysis parameters (which apply to all
+  // generated individual analyses
   metroloJDialog mjd;
   
+  // the list of generated individual coAlignement analyses
   public ArrayList<coAlignement> coas = new ArrayList<>();
-  
-  double ratioTolerance;
-  public QC_Generate_batchCoAlignementReport(){
-      
+
+  public QC_Generate_batchCoAlignementReport(){   
   }
+  /**
+ * Executes the batchCoAlignement report generation process.
+ * This function performs the following steps:
+ * - Performs an ImageJ version check
+ * - runs the coAlignement analyses. 
+ * - aggregates the results
+ * - Saves the compiled results in a report
+ * @param arg Unused parameter.
+ */
   public void run(String arg) {
       try {
           Commands.closeAll();
-           String error=doCheck.checkAllWithASingleMessage(check.VERSION_UP_TO_DATE);
+           String error=doCheck.checkAllWithASingleMessage(checks.VERSION_UP_TO_DATE);
            if (!error.isEmpty()) {
                 IJ.error("Batch co-alignment report error", error);
                 return; 
            } 
-          this.coas.clear();
-          String analysedImages = generateCoARs();
+          content[][] analysedImages = generateCoARs();
+          if (mjd.debugMode)content.contentTableChecker(analysedImages,"analysedImages as given by Generate_batchCoAlignementReport>generateCoARs");
           if (!this.coas.isEmpty()) {
-              batchCoAlignementReport bcoar = new batchCoAlignementReport(this.coas, this.micro, this.title, mjd.debugMode);
-              bcoar.compileCoARs(this.coas, this.mjd, this.ratioTolerance);
+              batchCoAlignementReport bcoar = new batchCoAlignementReport(this.coas, this.mjd, this.path);
+              bcoar.bcoa.aggregateCoAs();
               String reportPath = this.path + "Processed" + File.separator;
-              if (!this.title.equals(""))
-                  reportPath = reportPath + this.title + File.separator;
-              bcoar.saveReport(this.coas, reportPath, this.mjd, analysedImages, this.ratioTolerance);
+              if (!this.mjd.title.equals(""))
+                  reportPath = reportPath + this.mjd.title + File.separator;
+              bcoar.saveReport(reportPath, analysedImages);
               if (!IJ.isMacro())
                   fileTricks.showPdf(reportPath + "summary.pdf");
           } else {
@@ -68,190 +85,146 @@ public class QC_Generate_batchCoAlignementReport implements PlugIn {
           Logger.getLogger(QC_Generate_batchCoAlignementReport.class.getName()).log(Level.SEVERE, null, ex);
       }
   }
-  
-  public String generateCoARs() throws IOException {
-    if (Prefs.get("MetroloJ_wasPSFBead.boolean", true)) {
-      Prefs.set("MetroloJ_cropFactor.double", 5.0D);
-      Prefs.set("MetroloJ_beadSize.double", 4);
-      Prefs.set("MetroloJ_wasPSFBead.boolean", false);
-    } 
+  /**
+ * Generates a batch of individual co-alignment reports for a set of image files in the specified directory.
+ * Displays a dialog for generating the CoAlignement reports. The method opens 
+ * the first image in the specified directory and assumes all images have the same number of channels
+ * (and same channel specs).
+ * If the multiple beads option is used, identifies beads and 
+ * splits the input image into one single bead-containing substacks and saves them.
+ * Generates each individual coalignement analyses on the whole images (single-bead input stack) or using
+ * each single-bead substack previously generated. Saves each associated results
+ * into individual reports, according to the given parameters.
+ * @return a 2D array that summarizes how files were handled during the fieldIllumination analysis
+ * or null if no valid image files are found or an error occurs.
+ */
+  public content[][] generateCoARs() throws IOException { 
     DirectoryChooser chooser = new DirectoryChooser("Select Directory containing the files");
     this.path = chooser.getDirectory();
     String outPath = this.path + File.separator + "Processed" + File.separator;
     (new File(outPath)).mkdirs();
     importer importer = new importer(this.path, false);
-    String output = "Cancelled by user";
     if (importer.filesToOpen.isEmpty()) {
       IJ.error("Batch co-alignment report error", "There are no image files that Bio-formats can open");
-    } else {
-      importer.openImage(0, false, true, false);
-      String error=doCheck.checkAllWithASingleMessage(check.IS_NO_MORE_THAN_16_BITS+check.IS_CALIBRATED+check.IS_ZSTACK+check.IS_MULTICHANNEL);
-      if (!error.isEmpty()) {
-        error="Analysis of the first image in the directory has errors:\n"+error;  
-        IJ.error("Batch co-alignment report error", error);
-        return ""; 
-    }
-      this.mjd = new metroloJDialog("Batch Co-Registration report generator");
-      this.mjd.useBeads=true;
-      this.mjd.ip = IJ.getImage();
-      mjd.getReportName("Batch Co-Registration");
-      mjd.addStringField("Title_of_report", this.title);
-      mjd.addToSameRow();
-      mjd.addOperator();
-      this.mjd.addAllMicroscope(this.mjd.ip, false, 2);
-      this.mjd.addMultipleBeads(this.mjd.ip);
-      this.mjd.addSaveChoices("individual");
-      this.mjd.addOutliers();
-      this.mjd.addUseTolerance();
-      this.mjd.addToSameRow();
-      this.mjd.addNumericField("Reject coregistration if ratio > ", Prefs.get("MetroloJ_ratioTolerance.double", 1.0D), 1);
-      if (debug) this.mjd.addDebugMode();
-      this.mjd.showDialog();
-      if (this.mjd.wasCanceled())
-        return output; 
-      output = "";
-      this.title = this.mjd.getNextString();
-      mjd.getOperator();
-      this.mjd.getAllMicroscope(this.mjd.ip, false);
-      this.mjd.getMutlipleBeads(this.mjd.ip);
-      this.mjd.getSaveChoices();
-      this.mjd.getOutliers();
-      this.mjd.getUseTolerance();
-      this.ratioTolerance = this.mjd.getNextNumber();
-      if (debug) mjd.getDebugMode();
-      this.micro = this.mjd.getMicroscope();
-      Prefs.set("BatchcoAlignementReport_title.string", this.title);
-      this.mjd.savePrefs();
-      this.mjd.saveMultipleBeadsPrefs();
-      this.mjd.saveSavePrefs();
-      this.mjd.saveOutliersPrefs();
-      this.mjd.saveUseTolerancePrefs();
-      Prefs.set("MetroloJ_ratioTolerance.double", this.ratioTolerance);
-      ArrayList<content[]> result = (ArrayList)new ArrayList<>();
-      for (int k = 0; k < importer.filesToOpen.size(); k++) {
-        int cols = 2 + 3 * this.micro.emWavelengths.length;
-        content[] tempResult = new content[cols];
-        String creationDate;
-        if (k == 0) creationDate=importer.openImage(k, false, false, mjd.debugMode); 
-        else creationDate=importer.openImage(k, false, true, mjd.debugMode);
-        ImagePlus ip = IJ.getImage();
-        if (creationDate.isEmpty()) creationDate=simpleMetaData.getCreationDate(ip, mjd.debugMode);
-        if (creationDate.isEmpty()) creationDate="original file info & metadata could not be found";
-        String name = fileTricks.cropExtension(importer.filesToOpen.get(k));
-        name = fileTricks.cropName(name);
-        tempResult[0] = new content("name", 6);
-        output = output + "- " + name + ": ";
-        if (!this.title.equals("")) {
-          outPath = this.path + "Processed" + File.separator + this.title + File.separator + name + File.separator;
-        } else {
-          outPath = this.path + "Processed" + File.separator;
-        } 
-        File f = new File(outPath);
-        if (f.isDirectory()) {
-            //IJ.error("Batch co-alignment report error", "A previous report with the same name " + this.title + File.separator + name + " has been generated (file skipped)");
-            output = output + "\n    A report was previously generated (file skipped)";
-            tempResult[1] = new content("Already analysed, skipped", 0);
-            ip.close();
-        } 
-        else {
-          String tempError=doCheck.getIsCalibrated(ip);
-          if (!tempError.isEmpty()) {
-            output = output + "\n    Image "+tempError+", skipped";
-            ip.close();
-            tempResult[1] = new content(tempError, 0);
-          } else {
-                tempError=doCheck.getIsNoMoreThan16bits(ip);
-                if (!tempError.isEmpty()) {
-                    output = output + "\n    Image's depth is "+tempError+", skipped";
+      return null;
+    } 
+    else {
+        importer.openImage(0, false, true, false);
+        String error=doCheck.checkAllWithASingleMessage(checks.IS_NO_MORE_THAN_16_BITS+checks.IS_CALIBRATED+checks.IS_ZSTACK+checks.IS_MULTICHANNEL);
+        if (!error.isEmpty()) {
+            error="Analysis of the first image in the directory has errors:\n"+error;  
+            IJ.error("Batch co-alignment report error", error);
+            return null; 
+        }
+        this.mjd = new metroloJDialog("Batch Co-Registration report generator");
+        mjd.addMetroloJDialog();
+        mjd.showMetroloJDialog();
+        if (mjd.wasCanceled()){
+            IJ.error("Batch co-alignment report error", "Analysis cancelled by user");
+            return null;
+        }
+        mjd.getMetroloJDialog();
+        mjd.saveMetroloJDialog();
+        
+        Batch batch=new Batch(mjd);
+        
+        for (int k = 0; k < importer.filesToOpen.size(); k++) {
+            String [] creationInfo;
+            if (k == 0) creationInfo=importer.openImage(k, false, false, mjd.debugMode); 
+            else creationInfo=importer.openImage(k, false, true, mjd.debugMode);
+            ImagePlus ip = IJ.getImage();
+            String name=fileTricks.cropName(fileTricks.cropExtension(importer.filesToOpen.get(k)));
+            error=doCheck.checkAllWithASingleMessage(checks.IS_NO_MORE_THAN_16_BITS+checks.IS_CALIBRATED+checks.IS_ZSTACK+checks.IS_MULTICHANNEL);
+            if (!error.isEmpty()) {
+                batch.newImage(name, creationInfo[0], error);
+                ip.close();
+            }
+            else {
+                if (!this.mjd.title.equals("")) outPath = this.path + "Processed" + File.separator + this.mjd.title + File.separator + name + File.separator;
+                else outPath = this.path + "Processed" + File.separator;
+                File f = new File(outPath);
+                if (f.isDirectory()) {
+                    batch.newImage(name, creationInfo[0], "A report was previously generated, file skipped");
                     ip.close();
-                    tempResult[1] = new content(tempError, 0);
-                }
+                }      
                 else {
-                    tempError=doCheck.getIsNChannels(ip, mjd.emWavelengths.length);
-                    if (!tempError.isEmpty()) {
-                        output = output + "\nA "+tempError+"was found compared to the first image of the directory, skipped";
-                        ip.close();
-                        tempResult[1] = new content(tempError, 0);
-                    }
-                    else {
-                        (new File(outPath)).mkdirs();
-                        imageTricks.tempRemoveGlobalCal(ip);
-                        imageTricks.convertCalibration();
-                        Calibration cal=ip.getCalibration();
-                        tempResult[1] = new content("" + dataTricks.round(cal.pixelWidth, 3) + "x" + dataTricks.round(cal.pixelHeight, 3) + "x" + dataTricks.round(cal.pixelDepth, 3), 0);
-                        if (this.mjd.multipleBeads) {
-                            findBead fb = new findBead();
-                            ImagePlus beads = fb.getBeadsImage(ip, 1, this.mjd.beadChannel);
-                            fb.thresholdBeads(beads);
-                            beads.show();
-                            ArrayList<double[]> coords = fb.findBigBeads(ip,beads, this.mjd, outPath,1, this.mjd.beadChannel);
-                            beads.close();
-                            if (coords.isEmpty()) {
-                            output = output + "\n    No bead found";
-                            tempResult[2] = new content("No bead found", 0);
-                            } 
-                            else {
-                                tempResult[2] = new content("" + coords.size() + " beads found", 0);
-                                for (int i = 0; i < coords.size(); i++) {
-                                    String beadFolder = outPath + "bead" + i + File.separator;
-                                    (new File(beadFolder)).mkdirs();
-                                    String beadName = beadFolder + fileTricks.cropName(ip.getShortTitle()) + "_bead" + i;
-                                    ImagePlus roiImage = imageTricks.cropROI(ip, coords.get(i), beadName + ".tif", this.mjd.beadSize * this.mjd.cropFactor);
-                                    roiImage.setTitle(fileTricks.cropName(ip.getShortTitle()) + "_bead" + i + ".tif");
-                                    coAlignementReport coAR = new coAlignementReport(roiImage, this.micro, this.title, this.mjd, ip.getShortTitle(), creationDate, mjd.debugMode);
-                                    if (i == 0) {
-                                        String temp = warnings.simplifiedSamplingWarnings(coAR.coa.micro);
-                                        if (!temp.isEmpty()) {
-                                        temp = "U" + temp.substring(2);
-                                        output = output + temp;
-                                        } 
-                                    } 
-                                    output = output + "\n     Bead" + i + ": ";
-                                    if (coAR.coa.result) {
-                                        this.coas.add(coAR.coa);
-                                        String reportPath = beadName + ".pdf";
-                                        coAR.saveReport(reportPath, this.mjd, this.ratioTolerance);
-                                        if (!IJ.isMacro() && this.mjd.savePdf && this.mjd.openPdf) fileTricks.showPdf(reportPath); 
-                                        output = output + "analysed";
-                                        tempResult[3] = new content("bead " + i + ": analysed", 0);
-                                        output = output + warnings.simplifiedSaturationWarnings(coAR.coa.saturation);
-                                        output=output+warnings.simplifiedAnulusSizeWarnings(mjd, coAR.coa);
-                                    } 
-                                    else {
-                                        output = output + "not enough unsaturated channels to generate a report";
-                                        tempResult[3] = new content("not enough unsaturated channels", 0);
-                                    }
-                                    roiImage.close();
-                                } 
-                            } 
+                    (new File(outPath)).mkdirs();
+                    imageTricks.tempRemoveGlobalCal(ip);
+                    imageTricks.convertCalibration();
+                    if (this.mjd.multipleBeads) {
+                        findBeads fb = new findBeads();
+                        ArrayList<double[]> coords = fb.findBigBeads(ip, this.mjd, outPath+ip.getShortTitle(),1);
+                        //ImagePlus beadOverlay=fb.overlay.duplicate();
+                        if (coords.isEmpty()) {
+                            batch.newImage(name, creationInfo[0],"No valid beads found");
+                            ip.close();
                         } 
                         else {
-                            coAlignementReport coAR = new coAlignementReport(ip, this.micro, this.title, this.mjd, ip.getShortTitle(), creationDate, mjd.debugMode);
-                            if (coAR.coa.result) {
-                                this.coas.add(coAR.coa);
-                                String reportPath = outPath + File.separator + fileTricks.cropName(ip.getShortTitle()) + ".pdf";
-                                coAR.saveReport(reportPath, this.mjd, this.ratioTolerance);
-                                if (!IJ.isMacro() && this.mjd.savePdf && this.mjd.openPdf) fileTricks.showPdf(reportPath); 
-                                output = output + "analysed";
-                                tempResult[3] = new content("analysed", 0);
-                                output = output + warnings.simplifiedSaturationWarnings(coAR.coa.saturation);
-                                output=output+warnings.simplifiedAnulusSizeWarnings(mjd,coAR.coa);
-                            } 
-                            else {
-                                output = output + "not enough unsaturated channels to generate a report";
-                                tempResult[3] = new content("not enough unsaturated channels", 0);
-                            } 
+                            batch.newImage(name, creationInfo[0],"");
+                            batch.multipleBeadImages.get(k).setBeadIdentificationResult(fb.beadTypes);
+                            for (int bead = 0; bead < coords.size(); bead++) {
+                                String beadFolder = outPath + "bead" + bead + File.separator;
+                                (new File(beadFolder)).mkdirs();
+                                String beadName = beadFolder + fileTricks.cropName(ip.getShortTitle()) + "_bead" + bead;
+                                double calibratedHalfBox=Math.max((mjd.beadSize * mjd.cropFactor) / 2.0D, (mjd.beadSize/2.0D + mjd.anulusThickness+mjd.innerAnulusEdgeDistanceToBead)*1.1D);
+                                ImagePlus roiImage = imageTricks.cropROI(ip, coords.get(bead), beadName + ".tif", calibratedHalfBox);
+                                roiImage.setTitle(fileTricks.cropName(ip.getShortTitle()) + "_bead" + bead + ".tif");
+                                double[] originalBeadCoordinates=coords.get(bead);
+                                coAlignementReport coAR = new coAlignementReport(roiImage,this.mjd, ip.getShortTitle(), originalBeadCoordinates, creationInfo);
+                                if (bead == 0) {
+                                    batch.multipleBeadImages.get(k).setSampling(coAR.coa.micro.samplingRatios);
+                                    batch.multipleBeadImages.get(k).getImageSummary();
+                                }
+                                batch.multipleBeadImages.get(k).newBead(coAR.coa.saturation);
+                                if (coAR.coa.result) {
+                                    this.coas.add(coAR.coa);
+                                    String reportPath = beadName + ".pdf";
+                                    coAR.saveReport(reportPath);
+                                    if (!IJ.isMacro() && this.mjd.savePdf && this.mjd.openPdf) fileTricks.showPdf(reportPath); 
+                                    coAR.coa.closeImage();
+                                } 
+                                else {
+                                    coAR.coa.closeImage();
+                                }
+                                roiImage.close();
+                            }
+                            batch.multipleBeadImages.get(k).getSummary();
+                                    /* beadOverlay=imageTricks.StampResultsMultipleBeadsMode(beadOverlay, imageTricks.findFirstCOAResult(beadsCoas), dataTricks.getLessDoubles(coords,2), beadsFeatures, mjd,0);
+                                    if (mjd.debugMode) beadOverlay.show();
+                                    imageTricks.saveImage(beadOverlay, outPath, "annotatedBeadOverlay.jpg");
+                                    */
+                            ip.close();
                         } 
-                        imageTricks.restoreOriginalCal(ip);
-                        output = output + "\n\n";
-                        ip.close();
-                    }
+                    } 
+                    else {
+                        batch.newImage(name, creationInfo[0],"");
+                        double[] originalBeadCoordinates={Double.NaN,Double.NaN};
+                        coAlignementReport coAR = new coAlignementReport(ip, this.mjd, ip.getShortTitle(), originalBeadCoordinates, creationInfo);
+                        batch.singleBeadImages.get(k).setSaturationAndSampling(coAR.coa.saturation, coAR.coa.micro.samplingRatios);
+                        if (coAR.coa.result) {
+                            this.coas.add(coAR.coa);
+                            //features+=StringTricks.convertFixedArrayToString(content.extractString(coAR.coa.getSimpleRatiosArray()), 8, mjd.debugMode);
+                            String reportPath = outPath + File.separator + fileTricks.cropName(ip.getShortTitle()) + ".pdf";
+                            coAR.saveReport(reportPath);
+                            if (!IJ.isMacro() && this.mjd.savePdf && this.mjd.openPdf) fileTricks.showPdf(reportPath); 
+                            coAR.coa.closeImage();
+                        } 
+                        else {
+                            coAR.coa.closeImage();
+                        } 
+                        batch.singleBeadImages.get(k).getSummary();
+                        /*beadOverlay=imageTricks.StampResultsSingleBeadMode(beadOverlay, features,0);
+                                if (mjd.debugMode) beadOverlay.show();
+                                imageTricks.saveImage(beadOverlay, outPath + File.separator , "annotatedBeadOverlay.jpg");
+                                */
+                        ip.close();    
+                    }  
                 }
-            }    
-        } 
+            }
+        }    
+  
+        return batch.getReportSummary(mjd.multipleBeads);
     } 
-    
-    } 
-    return output;
-  }
+}
+
 }

@@ -6,89 +6,40 @@ import ij.io.DirectoryChooser;
 import ij.io.FileInfo;
 import ij.plugin.PlugIn;
 import java.io.File;
-import java.util.Date;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.FileTime;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import metroloJ_QC.importer.simpleMetaData;
 import metroloJ_QC.report.fieldIlluminationReport;
 import metroloJ_QC.setup.metroloJDialog;
-import metroloJ_QC.setup.microscope;
-import metroloJ_QC.utilities.check;
+import metroloJ_QC.utilities.checks;
 import metroloJ_QC.utilities.doCheck;
 import metroloJ_QC.utilities.tricks.fileTricks;
 import metroloJ_QC.utilities.tricks.imageTricks;
-
+ 
 public class QC_Generate_FieldIlluminationReport implements PlugIn {
-  public double stepWidth;
-  private static boolean debug=Prefs.get("General_debugMode.boolean", false);
-  public boolean thresholdChoice = Prefs.get("MetroloJ_fieldIllumnThresholdChoice.boolean", true);
+  private static final boolean debug=Prefs.get("General_debugMode.boolean", false);
   
-  public boolean gaussianBlurChoice = Prefs.get("MetroloJ_fieldIllumnGaussianBlurChoice.boolean", true);
-  
-  public String title = Prefs.get("fieldIlluminationReport_title.string", "");
-  
-  public microscope micro = null;
-  
-  public String imageCreationDate="";
-  
-  public QC_Generate_FieldIlluminationReport(){
-      
+  public QC_Generate_FieldIlluminationReport(){   
   }
+  /**
+ * Executes the fieldIllumination report generation process using the currently opened and selected image.
+ * This function performs the following steps:
+ * - Performs some checks (such as for ImageJ version, existence of an input calibrated image)
+ * - Displays a dialog for generating the fieldIllumination report.
+ * - Generates the fieldIllumination analyses and saves the associated results
+ * in a report if conditions are met.
+ * @param arg Unused parameter.
+ */
   public void run(String arg) {
-    String error=doCheck.checkAllWithASingleMessage(check.VERSION_UP_TO_DATE+check.IS_CALIBRATED+check.IMAGE_EXISTS);
+    String error=doCheck.checkAllWithASingleMessage(checks.VERSION_UP_TO_DATE+checks.IS_CALIBRATED+checks.IMAGE_EXISTS);
     if (!error.isEmpty()) {
         IJ.error("Field Illumination report error", error);
         return; 
     }
     metroloJDialog mjd = new metroloJDialog("Field illumination report generator");
-    mjd.getReportName("Field Illumination ");
-    mjd.addStringField("Title_of_report", this.title);
-    mjd.addToSameRow();
-    mjd.addOperator();
-    mjd.addAllMicroscope(mjd.ip, false, 0);
-    mjd.addCheckbox("Remove noise using Gaussian Blur", this.gaussianBlurChoice);
-    mjd.addNumericField("Intensity pattern bins", 100.0D / Prefs.get("MetroloJ_fieldIllumnSteps.double", 10.0D), 1);
-    mjd.addToSameRow();
-    mjd.addCheckbox("Use last bin as maximum reference zone", this.thresholdChoice);
-    mjd.addSaveChoices("");
-    mjd.addUseTolerance();
-    mjd.addToSameRow();
-    mjd.addNumericField("Reject Uniformity below ", Prefs.get("MetroloJ_uniformityTolerance.double", 50.0D));
-    mjd.addToSameRow();
-    mjd.addNumericField("Reject Cent. Accuracy below ", Prefs.get("MetroloJ_centAccTolerance.double", 50.0D));
-    if (debug) mjd.addDebugMode();
-    mjd.showDialog();
-    if (mjd.wasCanceled())
-      return; 
-    this.title = mjd.getNextString();
-    mjd.getOperator();
-    mjd.getAllMicroscope(mjd.ip, false);
-    this.gaussianBlurChoice = mjd.getNextBoolean();
-    int bins = (int)mjd.getNextNumber();
-    this.stepWidth = (100 / bins);
-    this.thresholdChoice = mjd.getNextBoolean();
-    mjd.getSaveChoices();
-    mjd.getUseTolerance();
-    double uniformityTolerance = mjd.getNextNumber();
-    double centAccTolerance = mjd.getNextNumber();
-    if (debug) mjd.getDebugMode();
-    this.micro = mjd.getMicroscope();
-    mjd.multipleBeads = false;
-    Prefs.set("fieldIlluminationReport_title.string", this.title);
-    mjd.savePrefs();
-    Prefs.set("MetroloJ_fieldIllumnGaussianBlurChoice.boolean", this.gaussianBlurChoice);
-    Prefs.set("MetroloJ_fieldIllumnSteps.double", this.stepWidth);
-    Prefs.set("MetroloJ_fieldIllumnThresholdChoice.boolean", this.thresholdChoice);
-    mjd.saveSavePrefs();
-    mjd.saveUseTolerancePrefs();
-    Prefs.set("MetroloJ_uniformityTolerance.double", uniformityTolerance);
-    Prefs.set("MetroloJ_centAccTolerance.double", centAccTolerance);
+    mjd.addMetroloJDialog();
+    mjd.showMetroloJDialog();
+    if (mjd.wasCanceled())return; 
+    mjd.getMetroloJDialog();
+    mjd.saveMetroloJDialog(); 
+    
     FileInfo fi = mjd.ip.getOriginalFileInfo();
     String path = "";
     if (fi!=null) path=fi.directory;
@@ -98,15 +49,15 @@ public class QC_Generate_FieldIlluminationReport implements PlugIn {
       if (path.endsWith("null"))
         IJ.showStatus("Process canceled by user..."); 
     } 
-    path = path + "Processed" + File.separator + this.title + File.separator;
+    path = path + "Processed" + File.separator + mjd.title + File.separator;
     (new File(path)).mkdirs();
-    String creationDate=simpleMetaData.getOMECreationDate(mjd.ip, mjd.debugMode);
     imageTricks.tempRemoveGlobalCal(mjd.ip);
     imageTricks.convertCalibration();
-    fieldIlluminationReport fir = new fieldIlluminationReport(mjd.ip, this.micro, this.gaussianBlurChoice, this.stepWidth, this.thresholdChoice, mjd.saturationChoice, this.title, false, mjd.debugMode, creationDate);
+    fieldIlluminationReport fir = new fieldIlluminationReport(mjd.ip, mjd);
     if (fir.fi.result) {
       String reportPath = path + File.separator + fileTricks.cropName(mjd.ip.getShortTitle()) + ".pdf";
-      fir.saveReport(reportPath, mjd, uniformityTolerance, centAccTolerance, this.stepWidth, this.gaussianBlurChoice);
+      fir.fi.mjd.getAnalysisParametersSummary(reportPath);
+      fir.saveReport(reportPath);
       if (!IJ.isMacro() && mjd.savePdf && mjd.openPdf)
         fileTricks.showPdf(reportPath); 
     } else if (mjd.saturationChoice) {

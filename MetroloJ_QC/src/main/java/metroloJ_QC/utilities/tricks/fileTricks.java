@@ -76,7 +76,11 @@ public class fileTricks {
     } 
     return out;
   }
-  
+ /** removes the folder information from a path and leaves the file name
+  * e.g. d:\Users\Julien Cau\Coalignement\100x_LSM980.czi > 100x_LSM980.czi
+  * @param path : the file's path
+  * @return the filename
+  */
   public static String cropName(String path) {
     String name = path;
     if (path.contains(File.separator)) {
@@ -89,17 +93,21 @@ public class fileTricks {
     } 
     return name;
   }
-  
-  public static String cropExtension(String path) {
-    String output = path;
-    if (path.contains(".")) {
-        int nb = path.lastIndexOf(".");
-        if (path.length()<75){
-            output = path.substring(0, nb);
+  /** removes the extension information from a file name
+  * e.g. 100x_LSM980.czi > 100x_LSM980
+  * @param fileName : the file's name
+  * @return the filename without the extension
+  */
+  public static String cropExtension(String fileName) {
+    String output = fileName;
+    if (fileName.contains(".")) {
+        int nb = fileName.lastIndexOf(".");
+        if (fileName.length()<75){
+            output = fileName.substring(0, nb);
         }
         else {
             output="";
-            for (int n=0; n<nb; n++) output+=path.charAt(n);
+            for (int n=0; n<nb; n++) output+=fileName.charAt(n);
         }
     } 
     return output;

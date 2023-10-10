@@ -13,76 +13,50 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import metroloJ_QC.importer.simpleMetaData;
 import metroloJ_QC.report.PSFprofilerReport;
+import metroloJ_QC.report.utilities.content;
+import metroloJ_QC.resolution.PSFprofiler;
 import metroloJ_QC.setup.metroloJDialog;
 import metroloJ_QC.setup.microscope;
-import metroloJ_QC.utilities.check;
+import metroloJ_QC.utilities.checks;
 import metroloJ_QC.utilities.doCheck;
-import metroloJ_QC.utilities.findBead;
+import metroloJ_QC.utilities.findBeads;
+import metroloJ_QC.utilities.tricks.StringTricks;
+import metroloJ_QC.utilities.tricks.dataTricks;
 import metroloJ_QC.utilities.tricks.fileTricks;
 import metroloJ_QC.utilities.tricks.imageTricks;
 
 public class QC_Generate_PSFReport implements PlugIn {
-  String title = Prefs.get("PSFReport_title.string", "");
   private static boolean debug=Prefs.get("General_debugMode.boolean", false);
-  public microscope micro = null;
   
-  public QC_Generate_PSFReport(){
-      
+  public QC_Generate_PSFReport(){ 
   }
+  /**
+ * Executes the PSF report generation process using the currently opened and selected image.
+ * This function performs the following steps:
+ * - Performs some checks (such as for ImageJ version, existence of an input calibrated 3D Z stack)
+ * - Displays a dialog for generating the PSF report.
+ * - when relevant (multiple beads-containing image stack), identifies beads and 
+ * splits the input 3D Z stack into one single bead-containing substacks and saves them
+ * - Generates the PSFProfiler analyses on the whole image (single-bead input Z stack) or using
+ * each single-bead substack previously generated. Saves the associated results
+ * in a report if conditions are met.
+ * 
+ * @param arg Unused parameter.
+ */
   public void run(String arg) {
-    String error=doCheck.checkAllWithASingleMessage(check.VERSION_UP_TO_DATE+check.IMAGE_EXISTS+check.IS_NO_MORE_THAN_16_BITS+check.IS_CALIBRATED+check.IS_ZSTACK);
+    String error=doCheck.checkAllWithASingleMessage(checks.VERSION_UP_TO_DATE+checks.IMAGE_EXISTS+checks.IS_NO_MORE_THAN_16_BITS+checks.IS_CALIBRATED+checks.IS_ZSTACK);
     if (!error.isEmpty()) {
         IJ.error("PSF report error", error);
         return; 
     } 
     IJ.run("Select None");
     metroloJDialog mjd = new metroloJDialog("PSF profiler report generator");
-    mjd.useBeads=true;
-    if (!Prefs.get("MetroloJ_wasPSFBead.boolean", true)) {
-      Prefs.set("MetroloJ_cropFactor.double", 50.0D);
-      Prefs.set("MetroloJ_beadSize.double", 0.2D);
-      Prefs.set("MetroloJ_wasPSFBead.boolean", true);
-    } 
-    mjd.getReportName("PSF Profiler");
-    mjd.addStringField("Title_of_report", this.title);
-    mjd.addToSameRow();
-    mjd.addOperator();
-    mjd.addAllMicroscope(mjd.ip, false, 1);
-    mjd.addMultipleBeads(mjd.ip);
-    mjd.addToSameRow();
-    mjd.addNumericField("Prominence value:", Prefs.get("MetroloJ_prominence.double", 100.0D), 0);
-    mjd.addCheckbox("Display square root PSF image", Prefs.get("MetroloJ_squareRoot.boolean", true));
-    mjd.addSaveChoices("");
-    mjd.addUseTolerance();
-    mjd.addToSameRow();
-    mjd.addNumericField("Reject XY ratio above ", Prefs.get("MetroloJ_XYratioTolerance.double", 1.5D), 1);
-    mjd.addToSameRow();
-    mjd.addNumericField("Reject Z ratio above ", Prefs.get("MetroloJ_ZratioTolerance.double", 2.0D), 1);
-    if (debug) mjd.addDebugMode();
-    mjd.showDialog();
-    if (mjd.wasCanceled())
-      return; 
-    this.title = mjd.getNextString();
-    mjd.getOperator();
-    mjd.getAllMicroscope(mjd.ip, false);
-    mjd.getMutlipleBeads(mjd.ip);
-    double prominence = mjd.getNextNumber();
-    boolean sqrtChoice = mjd.getNextBoolean();
-    mjd.getSaveChoices();
-    mjd.getUseTolerance();
-    double XYratioTolerance = mjd.getNextNumber();
-    double ZratioTolerance = mjd.getNextNumber();
-    if (debug) mjd.getDebugMode();
-    this.micro = mjd.getMicroscope();
-    Prefs.set("PSFReport_title.string", this.title);
-    mjd.savePrefs();
-    mjd.saveMultipleBeadsPrefs();
-    Prefs.set("MetroloJ_prominence.double", prominence);
-    Prefs.set("MetroloJ_squareRoot.boolean", sqrtChoice);
-    mjd.saveSavePrefs();
-    mjd.saveUseTolerancePrefs();
-    Prefs.set("MetroloJ_XYratioTolerance.double", XYratioTolerance);
-    Prefs.set("MetroloJ_ZratioTolerance.double", ZratioTolerance);
+    mjd.addMetroloJDialog();
+    mjd.showMetroloJDialog();
+    if (mjd.wasCanceled())return; 
+    mjd.getMetroloJDialog();
+    mjd.saveMetroloJDialog();
+    
     FileInfo fi = mjd.ip.getOriginalFileInfo();
     String path = "";
     if (fi!=null) path=fi.directory;
@@ -92,56 +66,86 @@ public class QC_Generate_PSFReport implements PlugIn {
       if (path.endsWith("null"))
         IJ.showStatus("Process canceled by user..."); 
     } 
-    path = path + File.separator + "Processed" + File.separator + this.title + File.separator;
+    path = path + File.separator + "Processed" + File.separator + mjd.title + File.separator;
     (new File(path)).mkdirs();
     if (!path.endsWith("null")) {
-      String creationDate=simpleMetaData.getOMECreationDate(mjd.ip, debug);
       imageTricks.convertCalibration();
       imageTricks.tempRemoveGlobalCal(mjd.ip);
-      
+      String [] creationInfo=simpleMetaData.getOMECreationInfos(mjd.ip, mjd.debugMode);
       if (mjd.multipleBeads) {
           try {
-              findBead fb = new findBead();
-              ImagePlus beads = fb.getBeadsImage(mjd.ip, 1, mjd.beadChannel);
-              beads.show();
+              findBeads fb = new findBeads();
               ArrayList<double[]> coords;
-              coords = fb.findSmallBeads(mjd.ip, beads, prominence, mjd, path,1, mjd.beadChannel);
-              beads.close();
-              if (coords.isEmpty()) {
-                  IJ.showStatus("Could not find any bead in image " + mjd.ip.getShortTitle());
-              } else {
-                  boolean atLeastOneValidReportGenerated = false;
-                  for (int i = 0; i < coords.size(); i++) {
-                      String beadFolder = path + "bead" + i + File.separator;
-                      (new File(beadFolder)).mkdirs();
-                      String beadName = beadFolder + fileTricks.cropName(mjd.ip.getShortTitle()) + "_bead" + i;
-                      ImagePlus roiImage = imageTricks.cropROI(mjd.ip, coords.get(i), beadName + ".tif", mjd.beadSize * mjd.cropFactor);
-                      roiImage.setTitle(beadName + ".tif");
-                      PSFprofilerReport ppr = new PSFprofilerReport(roiImage, this.micro, this.title, mjd, mjd.ip.getShortTitle(), sqrtChoice, creationDate, mjd.debugMode);
-                      if (ppr.pp.result) {
-                          String reportPath = beadName + ".pdf";
-                          ppr.saveReport(roiImage, reportPath, mjd, XYratioTolerance, ZratioTolerance, sqrtChoice);
-                          atLeastOneValidReportGenerated = true;
-                          if (!IJ.isMacro() && mjd.savePdf && mjd.openPdf)
-                              fileTricks.showPdf(reportPath);
-                      }
-                      roiImage.close();
-                  }
+              coords = fb.findSmallBeads(mjd.ip, mjd, path+mjd.ip.getShortTitle(),1);
+              ImagePlus beadOverlay=fb.overlay.duplicate();
+              
+                if (coords.isEmpty()) {
+                    IJ.showStatus("Could not find any bead in image " + mjd.ip.getShortTitle());
+                } 
+                else {
+                    boolean atLeastOneValidReportGenerated = false;
+                    ArrayList<PSFprofiler> beadsPPs = new ArrayList<>();
+                    ArrayList<String> beadsFeatures=new ArrayList<>();
+                    for (int i = 0; i < coords.size(); i++) {
+                        String beadFolder = path + "bead" + i + File.separator;
+                        (new File(beadFolder)).mkdirs();
+                        String beadName = beadFolder + fileTricks.cropName(mjd.ip.getShortTitle()) + "_bead" + i;
+                        double calibratedHalfBox=Math.max((mjd.beadSize * mjd.cropFactor) / 2.0D, (mjd.beadSize/2.0D + mjd.anulusThickness+mjd.innerAnulusEdgeDistanceToBead)*1.1D);
+                        ImagePlus roiImage = imageTricks.cropROI(mjd.ip, coords.get(i), beadName + ".tif", calibratedHalfBox);
+                        roiImage.setTitle(beadName + ".tif");
+                        double [] originalBeadCoordinates={coords.get(i)[0],coords.get(i)[1]};
+                        if(mjd.debugMode) IJ.log("(in generate PSF Report) bead"+i+" coordinates: "+originalBeadCoordinates[0]+", "+originalBeadCoordinates[1]);
+                        PSFprofilerReport ppr = new PSFprofilerReport(roiImage, mjd, mjd.ip.getShortTitle(), originalBeadCoordinates, creationInfo);
+                        beadsPPs.add(ppr.pp);
+                        String features="bead"+i+"\n";
+                        if (ppr.pp.result) {
+                            features+=StringTricks.convertFixedArrayToString(content.extractString(ppr.pp.getSimpleResolutionSummary()), 8, mjd.debugMode);
+                            String reportPath = beadName + ".pdf";
+                            ppr.pp.mjd.getAnalysisParametersSummary(reportPath);
+                            if (mjd.debugMode) content.contentTableChecker(ppr.pp.mjd.analysisParametersSummary, "ppr.pp.mjd.dialogParameters (as used in GeneratePSFProfilerReport)");
+                            if(mjd.debugMode) IJ.log("(in generate PSF Report) reportPath: "+reportPath+", features bead"+i+": "+features);
+                            ppr.saveReport(reportPath);
+                            if (!IJ.isMacro() && mjd.savePdf && mjd.openPdf) fileTricks.showPdf(reportPath);
+                            atLeastOneValidReportGenerated = true;
+                            ppr.pp.closeImage();
+                        }
+                        else {
+                            features+="saturated";
+                        }
+                        beadsFeatures.add(features);
+                        roiImage.close();
+                    }
+                    beadOverlay=imageTricks.StampResultsMultipleBeadsMode(beadOverlay, imageTricks.findFirstPPResult(beadsPPs),dataTricks.getLessDoubles(coords, 2),beadsFeatures, mjd,1);
+                    if (mjd.debugMode) beadOverlay.show();
+                    imageTricks.saveImage(beadOverlay, path, "annotatedBeadOverlay.jpg");
                   if (!atLeastOneValidReportGenerated && mjd.saturationChoice)
                       IJ.error("No unsaturated channel found in identified bead(s) to generate any report"); 
-              } } catch (IOException ex) {
+               }
+          } catch (IOException ex) {
               Logger.getLogger(QC_Generate_PSFReport.class.getName()).log(Level.SEVERE, null, ex);
           }
       } else {
-        PSFprofilerReport ppr = new PSFprofilerReport(mjd.ip, this.micro, this.title, mjd, mjd.ip.getShortTitle(), sqrtChoice, creationDate, mjd.debugMode);
+        double [] originalBeadCoordinates={Double.NaN,Double.NaN};
+        PSFprofilerReport ppr = new PSFprofilerReport(mjd.ip, mjd, mjd.ip.getShortTitle(), originalBeadCoordinates, creationInfo);
+        String features="Single bead mode\n";
+        ImagePlus beadOverlay=imageTricks.getBestProjection(mjd.ip, mjd.debugMode);
         if (ppr.pp.result) {
+          features+=StringTricks.convertFixedArrayToString(content.extractString(ppr.pp.getSimpleResolutionSummary()), 8, mjd.debugMode);  
           String reportPath = path + File.separator + fileTricks.cropName(mjd.ip.getShortTitle()) + ".pdf";
-          ppr.saveReport(mjd.ip, reportPath, mjd, XYratioTolerance, ZratioTolerance, sqrtChoice);
+          ppr.pp.mjd.getAnalysisParametersSummary(reportPath);
+          if (mjd.debugMode) content.contentTableChecker(ppr.pp.mjd.analysisParametersSummary, "ppr.pp.mjd.dialogParameters (as used in GeneratePSFProfilerReport)");
+
+          ppr.saveReport(reportPath);
           if (!IJ.isMacro() && mjd.savePdf && mjd.openPdf)
             fileTricks.showPdf(reportPath); 
-        } else if (mjd.saturationChoice) {
-          IJ.error("No unsaturated channel found to generate any report");
         } 
+        else    if (mjd.saturationChoice) {
+                features+="\nsaturated";  
+                IJ.error("No unsaturated channel found to generate any report");
+        } 
+        beadOverlay=imageTricks.StampResultsSingleBeadMode(beadOverlay, features,0);
+        if (mjd.debugMode) beadOverlay.show();
+        imageTricks.saveImage(beadOverlay, path, "annotatedBeadOverlay.jpg");
       } 
      imageTricks.restoreOriginalCal(mjd.ip);
     } else {

@@ -10,7 +10,6 @@ import ij.measure.Measurements;
 import ij.plugin.filter.Analyzer;
 import ij.measure.*;
 import ij.plugin.ChannelSplitter;
-import ij.plugin.Colors;
 import metroloJ_QC.utilities.tricks.dataTricks;
 
 /**

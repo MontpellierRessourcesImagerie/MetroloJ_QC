@@ -2,25 +2,46 @@ package utilities.miscellaneous;
 
 import ij.IJ;
 import ij.ImagePlus;
+import ij.Prefs;
 import ij.gui.NewImage;
 import ij.process.ImageProcessor;
-
-public class HistogramSegmentation {
+/**
+ * This class allows segmentation of an Image's histogram using the legacy algorithm as
+ * used in the original MetroloJ plugin
+ */
+public class LegacyHistogramSegmentation {
+  // the histogram of the image
   int[] histo;
   
+// the histogram's minimum value
   int min = 0;
   
+  // the histogram's maximum value
   int max = 0;
+  // an array containing the limits values
+  public int[] limits;
+ 
+// a boolean to display or not debug message in IJ's log window
+  boolean debugMode=Prefs.get("MetroloJDialog_debugMode.Boolean", false);
   
-  int[] limits;
-  
-  public HistogramSegmentation(ImagePlus ip) {
+/**
+ * Constructs a LegacyHistogramSegmentation instance for processing 8- or 16-bit images.
+ * This constructor initializes a LegacyHistogramSegmentation instance and computes the 3D histogram of pixel values in the image.
+ * It calculates the maximum, minimum, and frequency of each pixel value across the 3D stack.
+ * @param ip A single channel ImagePlus object for which histogram-based segmentation is to be performed.
+ * If using a multichannel ImagePlus, the current displayed channel is used.
+ * Minimum and maximum intensities across the 3D stack are stored in min and max variables respectively.
+ * The 1D histogram array (representing the dynamic range size) is stored in the histo variable.
+ */
+  public LegacyHistogramSegmentation(ImagePlus ip) {
     int bitDepth = ip.getBitDepth();
     if (bitDepth != 8 && bitDepth != 16)
       throw new IllegalArgumentException("Histo_seg expect a 8- or 16-bits images"); 
     this.max = 0;
     this.min = (int)Math.pow(2.0D, bitDepth);
     this.histo = new int[this.min];
+    //line below added compared to MetroloJ :
+    for (int i=0; i<histo.length; i++) histo[i]=0;
     for (int z = 1; z <= ip.getNSlices(); z++) {
       ip.setSlice(z);
       for (int y = 0; y < ip.getHeight(); y++) {
@@ -31,9 +52,24 @@ public class HistogramSegmentation {
           this.histo[val] = this.histo[val] + 1;
         } 
       } 
-    } 
+    }
+    if (debugMode) IJ.log("(in HistogramSegmentation) channel "+ip.getShortTitle()+"max: "+max+", min: "+min+" found in full Z Stack");
   }
-  
+  /**
+   * Calculates class limits for histogram segmentation using the Expectation-Maximization algorithm. 
+   * The histo variable is divided into nClasses. Average class intensity values are calculated.
+   * The method iterates until either the maximum number of iterations (maxIt) is reached or 
+   * the convergence factor (convFact) falls below a specified threshold (epsilon).
+   * For each iteration, it computes the means for each class based 
+   * on the current class limits and histogram values. It then updates the class limits 
+   * by averaging the means of adjacent classes. The iteration finishes by calculating
+   * the convergence factor (=measuring the difference between the current and previous class limits).
+   * @param nClasses The desired number of classes for histogram segmentation.
+   * @param maxIt The maximum number of iterations for the EM algorithm.
+   * @param epsilon The convergence threshold for stopping the EM algorithm.
+   * @param log Flag to indicate whether to use log of histogram's frequency values during mean computation.
+   * @return An array representing the computed class limits for histogram segmentation.
+ */
   public int[] calcLimits(int nClasses, int maxIt, int epsilon, boolean log) {
     int convFact;
     double[] means = new double[nClasses];
@@ -47,8 +83,7 @@ public class HistogramSegmentation {
     int it = 0;
     do {
       int[] oldLimits = (int[])this.limits.clone();
-      int j;
-      for (j = 0; j < nClasses; j++) {
+      for (int j = 0; j < nClasses; j++) {
         double freq = 0.0D, mean = 0.0D;
         int limLow = this.limits[j], limHigh = (j == nClasses - 1) ? (this.limits[j + 1] + 1) : this.limits[j + 1];
         for (int k = limLow; k < limHigh; k++) {
@@ -58,12 +93,12 @@ public class HistogramSegmentation {
         } 
         means[j] = mean / freq;
       } 
-      for (j = 1; j < nClasses; ) {
+      for (int j = 1; j < nClasses; ) {
         this.limits[j] = (int)Math.floor((means[j - 1] + means[j]) / 2.0D);
         j++;
       } 
       convFact = 0;
-      for (j = 0; j < nClasses + 1; ) {
+      for (int j = 0; j < nClasses + 1; ) {
         convFact += Math.abs(this.limits[j] - oldLimits[j]);
         j++;
       } 
@@ -72,122 +107,11 @@ public class HistogramSegmentation {
     return this.limits;
   }
   
-  public int[] getLimitsFluo(int nClasses) {
-    return calcLimits(nClasses, 1000, 0, true);
-  }
-  
-  public int[] getLimitsTrans(int nClasses) {
-    return calcLimits(nClasses, 1000, 0, false);
-  }
-  
-  public int[] getHisto() {
-    return this.histo;
-  }
-  
-  public double getMean(int nClasse) {
-    nClasse--;
-    if (this.limits == null)
-      throw new IllegalArgumentException("calcLimits has not yet been called."); 
-    if (nClasse < 0 || nClasse > this.limits.length - 1)
-      throw new IllegalArgumentException("Class number out of the [1-" + (this.limits.length - 1) + "] range."); 
-    double mean = 0.0D;
-    double freq = 0.0D;
-    int limLow = this.limits[nClasse], limHigh = (nClasse == this.limits.length - 1) ? (this.limits[nClasse + 1] + 1) : this.limits[nClasse + 1];
-    for (int i = limLow; i < limHigh; i++) {
-      freq += this.histo[i];
-      mean += (i * this.histo[i]);
-    } 
-    return mean / freq;
-  }
-  
-  public double[] getMean() {
-    if (this.limits == null)
-      throw new IllegalArgumentException("calcLimits has not yet been called."); 
-    double[] mean = new double[this.limits.length - 1];
-    for (int i = 1; i < this.limits.length; i++)
-      mean[i - 1] = getMean(i); 
-    return mean;
-  }
-  
-  public int getMedian(int nClasse) {
-    nClasse--;
-    if (this.limits == null)
-      throw new IllegalArgumentException("calcLimits has not yet been called."); 
-    if (nClasse < 0 || nClasse > this.limits.length - 1)
-      throw new IllegalArgumentException("Class number out of the [1-" + (this.limits.length - 1) + "] range."); 
-    int median = 0, nbVal = 0, limLow = this.limits[nClasse], limHigh = (nClasse == this.limits.length - 1) ? (this.limits[nClasse + 1] + 1) : this.limits[nClasse + 1];
-    for (int i = limLow; i < limHigh; ) {
-      nbVal += this.histo[i];
-      i++;
-    } 
-    nbVal /= 2;
-    int currNb = 0, j = limLow;
-    do {
-      currNb += this.histo[j];
-      median = j;
-      j++;
-    } while (currNb < nbVal && j <= limHigh);
-    return median;
-  }
-  
-  public int[] getMedian() {
-    if (this.limits == null)
-      throw new IllegalArgumentException("calcLimits has not yet been called."); 
-    int[] median = new int[this.limits.length - 1];
-    for (int i = 1; i < this.limits.length; i++)
-      median[i - 1] = getMedian(i); 
-    return median;
-  }
-  
-  public int getNb(int nClasse) {
-    nClasse--;
-    if (this.limits == null)
-      throw new IllegalArgumentException("calcLimits has not yet been called."); 
-    if (nClasse < 0 || nClasse > this.limits.length - 1)
-      throw new IllegalArgumentException("Class number out of the [1-" + (this.limits.length - 1) + "] range."); 
-    int nb = 0;
-    int limLow = this.limits[nClasse], limHigh = (nClasse == this.limits.length - 1) ? (this.limits[nClasse + 1] + 1) : this.limits[nClasse + 1];
-    for (int i = limLow; i < limHigh; i++)
-      nb += this.histo[i]; 
-    return nb;
-  }
-  
-  public int[] getNb() {
-    if (this.limits == null)
-      throw new IllegalArgumentException("calcLimits has not yet been called."); 
-    int[] nb = new int[this.limits.length - 1];
-    for (int i = 1; i < this.limits.length; i++)
-      nb[i - 1] = getNb(i); 
-    return nb;
-  }
-  
-  public int getIntegratedInt(int nClasse) {
-    nClasse--;
-    if (this.limits == null)
-      throw new IllegalArgumentException("calcLimits has not yet been called."); 
-    if (nClasse < 0 || nClasse > this.limits.length - 1)
-      throw new IllegalArgumentException("Class number out of the [1-" + (this.limits.length - 1) + "] range."); 
-    int intInt = 0;
-    int limLow = this.limits[nClasse], limHigh = (nClasse == this.limits.length - 1) ? (this.limits[nClasse + 1] + 1) : this.limits[nClasse + 1];
-    for (int i = limLow; i < limHigh; i++)
-      intInt += i * this.histo[i]; 
-    return intInt;
-  }
-  
-  public int[] getIntegratedInt() {
-    if (this.limits == null)
-      throw new IllegalArgumentException("calcLimits has not yet been called."); 
-    int[] intInt = new int[this.limits.length - 1];
-    for (int i = 1; i < this.limits.length; i++)
-      intInt[i - 1] = getIntegratedInt(i); 
-    return intInt;
-  }
-  
   public ImagePlus getsegmentedImage(ImagePlus ip) {
     if (this.limits == null)
       throw new IllegalArgumentException("calcLimits has not yet been called."); 
     ImagePlus dest = IJ.createImage("SegImg_" + ip.getTitle(), ip.getBitDepth() + "-bit", ip.getWidth(), ip.getHeight(), ip.getNSlices());
-    for (int z = 1; z <= ip.getNSlices(); z++) {
+      for (int z = 1; z <= ip.getNSlices(); z++) {
       ip.setSlice(z);
       dest.setSlice(z);
       ImageProcessor oriProc = ip.getProcessor();
@@ -219,6 +143,7 @@ public class HistogramSegmentation {
     if (nClass < 0 || nClass >= this.limits.length)
       throw new IllegalArgumentException("nClass out of bounds."); 
     ImagePlus dest = NewImage.createImage("SegImg_class_" + nClass + "_" + ip.getTitle(), ip.getWidth(), ip.getHeight(), ip.getNSlices(), 8, 1);
+    //dest.setCalibration(ip.getCalibration());
     for (int z = 1; z <= ip.getNSlices(); z++) {
       ip.setSlice(z);
       dest.setSlice(z);
