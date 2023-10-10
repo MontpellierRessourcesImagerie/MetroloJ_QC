@@ -1,6 +1,5 @@
 package utilities.miscellaneous;
 
-
 import ij.*;
 import java.awt.*;
 import java.awt.image.*;
@@ -13,8 +12,7 @@ import ij.plugin.ChannelSplitter;
 import metroloJ_QC.utilities.tricks.dataTricks;
 
 /**
- *
- * @author Julien Cau
+ * This class is used to produce a heatmap calibration bar
  */
 public class calBar {
 final static int fire=4;

@@ -107,36 +107,14 @@ public class LegacyHistogramSegmentation {
     return this.limits;
   }
   
-  public ImagePlus getsegmentedImage(ImagePlus ip) {
-    if (this.limits == null)
-      throw new IllegalArgumentException("calcLimits has not yet been called."); 
-    ImagePlus dest = IJ.createImage("SegImg_" + ip.getTitle(), ip.getBitDepth() + "-bit", ip.getWidth(), ip.getHeight(), ip.getNSlices());
-      for (int z = 1; z <= ip.getNSlices(); z++) {
-      ip.setSlice(z);
-      dest.setSlice(z);
-      ImageProcessor oriProc = ip.getProcessor();
-      ImageProcessor destProc = dest.getProcessor();
-      for (int y = 0; y < ip.getHeight(); y++) {
-        for (int x = 0; x < ip.getWidth(); x++) {
-          int val = oriProc.get(x, y);
-          boolean wasChanged = false;
-          for (int borne = 0; borne < this.limits.length - 1; borne++) {
-            if (val >= this.limits[borne] && val < this.limits[borne + 1]) {
-              destProc.set(x, y, borne + 1);
-              wasChanged = true;
-            } 
-          } 
-          if (!wasChanged)
-            destProc.set(x, y, this.limits.length - 1); 
-        } 
-      } 
-    } 
-    dest.setSlice(1);
-    dest.setDisplayRange(0.0D, (this.limits.length - 1));
-    dest.updateAndDraw();
-    return dest;
-  }
-  
+  /**
+ * Generates a segmented mask image based on a specified class limit.
+ * The segmentation results in a binary image where pixels above the specified 
+ * class limit are set to 255 (white), and others are set to 0 (black).
+ * @param ip The input ImagePlus object to segment.
+ * @param nClass The index of the class for segmentation (zero-indexed).
+ * @return A new ImagePlus object representing the segmented image mask
+ */
   public ImagePlus getsegmentedImage(ImagePlus ip, int nClass) {
     if (this.limits == null)
       throw new IllegalArgumentException("calcLimits has not yet been called."); 
@@ -166,29 +144,5 @@ public class LegacyHistogramSegmentation {
     dest.setDisplayRange(0.0D, 255.0D);
     dest.updateAndDraw();
     return dest;
-  }
-  
-  public void doSegmentation(ImagePlus ip) {
-    for (int z = 1; z <= ip.getNSlices(); z++) {
-      ip.setSlice(z);
-      ImageProcessor iproc = ip.getProcessor();
-      for (int y = 0; y < ip.getHeight(); y++) {
-        for (int x = 0; x < ip.getWidth(); x++) {
-          int val = iproc.get(x, y);
-          boolean wasChanged = false;
-          for (int borne = 0; borne < this.limits.length - 1; borne++) {
-            if (val >= this.limits[borne] && val < this.limits[borne + 1]) {
-              iproc.set(x, y, borne + 1);
-              wasChanged = true;
-            } 
-          } 
-          if (!wasChanged)
-            iproc.set(x, y, this.limits.length - 1); 
-        } 
-      } 
-    } 
-    ip.setSlice(1);
-    ip.setDisplayRange(0.0D, (this.limits.length - 1));
-    ip.updateAndDraw();
   }
 }

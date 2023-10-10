@@ -26,14 +26,32 @@ import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 import metroloJ_QC.reportGenerators.QC_Generate_Tests;
 
-
+/**
+ * This class is used to display MetroloJ_QC main menu. It uses methods from the ActionBar plugin.
+ */
 public class MetroloJ_QC_ implements PlugIn, ActionListener, Runnable {
+    // the plugin's version
     public static final String VERSION="1.2.8";
-    public static final String ImageJVERSION="1.53e";
-    boolean debugMode=Prefs.get("General_debugMode.boolean", false); 
-    boolean scrollBarsOptions=Prefs.get("General_scrollBars.boolean", true);
-    boolean HideInfoAndComments=Prefs.get("MetroloJDialog_HideInfoAndComments.boolean", true);
+    
+    // a boolean used to allow for the display of the debug checkboxes in each individual dialogs
+    // change this back to false when releasing a new version
     boolean showDebugOptions=true;
+    
+    // the minimal ImageJ version that is necessary to run the plugin    
+    public static final String ImageJVERSION="1.53e";
+    boolean debugMode=Prefs.get("General_debugMode.boolean", false);
+    
+    // a boolean used to allow scrollable dialogs
+    boolean scrollBarsOptions=Prefs.get("General_scrollBars.boolean", true);
+    
+    // a boolean used to hide info and comments fields in each individual dialogs
+    boolean HideInfoAndComments=Prefs.get("MetroloJDialog_HideInfoAndComments.boolean", true);
+    
+
+    
+    // a boolean used to allow for the display of non verified tools
+    boolean showUnverifiedTools=Prefs.get("General_showUnverifiedTools.boolean", false);
+    
     boolean FI=Prefs.get("QCbarFI.boolean", true);
     boolean batch=Prefs.get("QCbarBatch.boolean", true);
     boolean PP=Prefs.get("QCbarPP.boolean", true);
@@ -42,7 +60,7 @@ public class MetroloJ_QC_ implements PlugIn, ActionListener, Runnable {
     boolean CAM=Prefs.get("QCbarCAM.boolean", true); 
     boolean CV=Prefs.get("QCbarCV.boolean", true); 
     boolean POS=Prefs.get("QCbarPos.boolean", true);
-    boolean TEST=false;
+    
     String name, path;
     String title="MetroloJ_QC v"+VERSION;
     String separator = System.getProperty("file.separator");
@@ -71,64 +89,68 @@ public class MetroloJ_QC_ implements PlugIn, ActionListener, Runnable {
     Color[] presetColors = { new Color(255,255,255), new Color(192,192,192), new Color(213,170,213), new Color(170,170,255), new Color(170,213,255), new Color(170,213,170),new Color(255,255,170), new Color(250,224,175), new Color(255,170,170) };
     Color bgColor;
 
-
+/**
+ * Displaus the main MetroloJ_QC dialog
+ * This method is triggered when the plugin is run, either from another plugin, an installed command, or a macro function.
+ * It sets various preferences, initializes the frame, designs buttons and panels, and displays the frame accordingly.
+ *
+ * @param s The input string used if called from another plugin or an installed command.
+ */
 public void run(String s) {
     // s used if called from another plugin, or from an installed command.
     // arg used when called from a run("command", arg) macro function
-    TEST=showDebugOptions;
-    String temp=Prefs.get("General_version.String", "");
     Prefs.set("General_version.String", VERSION);
     Prefs.set("General_ImageJversion.String", ImageJVERSION);
-    Prefs.set("General_debugMode.boolean", false);
     Prefs.set("General_debugMode.boolean", showDebugOptions);
     frame=new JFrame();
     bgColor=presetColors[0];
     frame.setBackground(bgColor);
-
     if (s.equals("About")) {
         showAbout();
         return;
     }
     initializeFrame();
     designButtons(0);
-    
     designPanel();
     displayFrame();
-
-
-
 }
-
-    private void stickToActiveWindow() {
-	ImageWindow fw = WindowManager.getCurrentWindow();
-	updateButtons();
-	try {
-            if (fw != null) {
-		if (!frame.isVisible())
-                    frame.setVisible(true);
-                    frame.toFront();
-                    frame.setLocation(fw.getLocation().x + fw.getWidth(), fw.getLocation().y);
+/**
+ * Positions the plugin's frame adjacent to the active ImageJ window.
+ * The plugin frame is made visible and positioned next to the active ImageJ window, if available.
+ * If no ImageJ window is active, the method takes no action.
+ */
+private void stickToActiveWindow() {
+    ImageWindow fw = WindowManager.getCurrentWindow();
+    updateButtons();
+    try {
+        if (fw != null) {
+            if (!frame.isVisible()) frame.setVisible(true);
+                frame.toFront();
+                frame.setLocation(fw.getLocation().x + fw.getWidth(), fw.getLocation().y);
             }
 	}
-        catch (Exception e) {
-        }
-    }
-
-    private void updateButtons() {
-	Component[] barContent=frame.getContentPane().getComponents();
-	for(int i=0; i<barContent.length; i++) {
-            if (barContent[i] instanceof javax.swing.JToolBar) {
-		Component[] buttonsContent = ((JToolBar) barContent[i]).getComponents();
-		for(int j=0; j<buttonsContent.length; j++) {
-                    if (buttonsContent[j] instanceof javax.swing.JButton) {
-                        String cmd=((JButton) buttonsContent[j]).getActionCommand();
-			switch (cmd){
-                            case "QC_Generate_FieldIlluminationReport" :
-                                buttonsContent[j].setEnabled(FI);
-                                break;
-                            case "QC_Generate_PSFReport" :
+    catch (Exception e) {}
+}
+/**
+ * Updates the enabled state of buttons in the plugin's toolbar based on the current settings.
+ * The method iterates through each toolbar's individual components, enabling or disabling buttons according to predefined conditions.
+ * The enabled state of buttons is based on specific action commands and their associated boolean flags.
+ */
+private void updateButtons() {
+    Component[] barContent=frame.getContentPane().getComponents();
+    for(int i=0; i<barContent.length; i++) {
+        if (barContent[i] instanceof javax.swing.JToolBar) {
+            Component[] buttonsContent = ((JToolBar) barContent[i]).getComponents();
+            for(int j=0; j<buttonsContent.length; j++) {
+                if (buttonsContent[j] instanceof javax.swing.JButton) {
+                    String cmd=((JButton) buttonsContent[j]).getActionCommand();
+                    switch (cmd){
+                           case "QC_Generate_FieldIlluminationReport" :
+                               buttonsContent[j].setEnabled(FI);
+                            break;
+                           case "QC_Generate_PSFReport" :
                                 buttonsContent[j].setEnabled(PP);
-                                break;
+                               break;
                             case "QC_Generate_zProfileReport()":
                                 buttonsContent[j].setEnabled(ZP);
                                 break;
@@ -150,15 +172,13 @@ public void run(String s) {
                             case "QC_Generate_batchCoAlignementReport":
                                 buttonsContent[j].setEnabled(COA&&batch);
                                 break;
-                            case "QC_Generate_Test_Reports":
-                                buttonsContent[j].setEnabled(TEST);
-                                break;
                         }
                     }
                 }
             }
         }
     }
+
 private void designButtons(int i) {
         bgColor=presetColors[i];
         //String frameiconName = "logo_RT-MFM.jpg";
