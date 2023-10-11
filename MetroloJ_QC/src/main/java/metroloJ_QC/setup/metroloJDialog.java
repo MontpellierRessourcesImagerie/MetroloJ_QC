@@ -52,6 +52,9 @@ public class metroloJDialog extends GenericDialog {
   // boolean that stores the result of the "show debug logs & images" checkbox
   public boolean debugMode=Prefs.get("MetroloJDialog_debugMode.Boolean", false);
   
+  // boolean used to use other unverified analysis tools
+  public boolean otherTools=Prefs.get("General_UseOtherTools.boolean", false);
+  
   // String that stores the name of the operator that generated & analysed the data
   public String operator=Prefs.get("MetroloJDialog_operator.String", "");
   

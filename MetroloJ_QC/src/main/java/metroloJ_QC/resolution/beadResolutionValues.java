@@ -5,19 +5,20 @@ package metroloJ_QC.resolution;
  * It is used to filter resolution values (according to associated fitGoodness for instance
  * or the value being an outlier) while keeping the associated goodness and SB ratio values together
  */
-  public class resR2 {
+  public class beadResolutionValues {
    Double res=Double.NaN;
    Double R2=Double.NaN;
    Double SBR=Double.NaN;
-   
-  public resR2() {
+   Boolean outlier=false;
+   Boolean filtered=false;
+  public beadResolutionValues() {
   } 
   
   /**
    * Constructs an instance of resR2
    * @param value: An array of Doubles containing resolution, R2/fitGoodness value, and SBR in that order.
    */
-    public resR2(Double[] value) {
+    public beadResolutionValues(Double[] value) {
     this.res = value[0];
     this.R2 = value[1];
     this.SBR=value[2];
@@ -28,10 +29,17 @@ package metroloJ_QC.resolution;
      * @param R2: the associated fit goodness value
      * @param SBR: the signal to background value of the associated bead
    */
-    public resR2(Double res, Double R2, Double SBR) {
+    public beadResolutionValues(Double res, Double R2, Double SBR) {
     this.res = res;
     this.R2 = R2;
     this.SBR = SBR;
+  } 
+ 
+    public String getStatus() {
+    String output="Valid";
+    if (this.filtered) output="filtered-out (low R2)";
+    if (this.outlier) output="outlier res. value";
+    return(output);
   } 
     
  /**
@@ -39,8 +47,8 @@ package metroloJ_QC.resolution;
  * @param value An array of Doubles containing resolution, R2 value, and SBR in that order.
  * @return A ResR2 object initialized with the specified values.
  */
-    public resR2 createResR2(Double[] value) {
-    resR2 output= new resR2(value);
+    public beadResolutionValues createResR2(Double[] value) {
+    beadResolutionValues output= new beadResolutionValues(value);
     return output;
   }  
  /**
@@ -50,13 +58,13 @@ package metroloJ_QC.resolution;
  * @param SBR: the signal to background value of the associated bead
  * @return A ResR2 object initialized with the specified values.
  */
-    public resR2 createResR2(Double res, Double R2, Double SBR) {
-    resR2 output= new resR2(res, R2, SBR);
+    public beadResolutionValues createResR2(Double res, Double R2, Double SBR) {
+    beadResolutionValues output= new beadResolutionValues(res, R2, SBR);
     return output;
   }
     
     /**
-     * Retrieves the resolution value of a resR2 object
+     * Retrieves the resolution value of a beadResolutionValues object
      * @return the resolution value
      */
     public Double getRes(){
@@ -64,7 +72,7 @@ package metroloJ_QC.resolution;
     }
     
      /**
-     * Retrieves the fit goodness value of a resR2 object
+     * Retrieves the fit goodness value of a beadResolutionValues object
      * @return the fit goodness (R2) value
      */
     public Double getR2(){
@@ -72,7 +80,7 @@ package metroloJ_QC.resolution;
     }
     
     /**
-     * Retrieves the signal to background value of a resR2 object
+     * Retrieves the signal to background value of a beadResolutionValues object
      * @return the SB ratio (SBR) value
      */
     public Double getSBR(){

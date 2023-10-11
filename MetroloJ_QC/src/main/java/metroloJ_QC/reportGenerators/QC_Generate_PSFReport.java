@@ -9,6 +9,7 @@ import ij.plugin.PlugIn;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import metroloJ_QC.importer.simpleMetaData;
@@ -115,7 +116,7 @@ public class QC_Generate_PSFReport implements PlugIn {
                         beadsFeatures.add(features);
                         roiImage.close();
                     }
-                    beadOverlay=imageTricks.StampResultsMultipleBeadsMode(beadOverlay, imageTricks.findFirstPPResult(beadsPPs),dataTricks.getLessDoubles(coords, 2),beadsFeatures, mjd,1);
+                    beadOverlay=imageTricks.StampResultsMultipleBeadsMode(beadOverlay, findFirstPPResult(beadsPPs),dataTricks.shortenArrays(coords, 2),beadsFeatures, mjd,1);
                     if (mjd.debugMode) beadOverlay.show();
                     imageTricks.saveImage(beadOverlay, path, "annotatedBeadOverlay.jpg");
                   if (!atLeastOneValidReportGenerated && mjd.saturationChoice)
@@ -152,5 +153,18 @@ public class QC_Generate_PSFReport implements PlugIn {
       IJ.showStatus("Process canceled by user...");
     }
   }
-
+  
+/**
+   * Finds the first bead PSFProfiler that was successfully analysed (=went through
+   * the preliminary checks)
+   * @param beadsPPs: the list of identified bead's PSFProfilers
+   * @return the list ID of the bead
+   */  
+public static int findFirstPPResult(List<PSFprofiler> beadsPPs){
+        int output=-1;
+        for (int n=0; n<beadsPPs.size(); n++){
+            if (beadsPPs.get(n).result)return(n);   
+        }
+      return(output);
+    }
 }

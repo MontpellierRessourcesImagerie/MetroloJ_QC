@@ -29,7 +29,7 @@ import metroloJ_QC.reportGenerators.QC_Generate_Tests;
 /**
  * This class is used to display MetroloJ_QC main menu. It uses methods from the ActionBar plugin.
  */
-public class MetroloJ_QC_ implements PlugIn, ActionListener, Runnable {
+public class MetroloJ_QC implements PlugIn, ActionListener, Runnable {
     // the plugin's version
     public static final String VERSION="1.2.8";
     
@@ -47,10 +47,8 @@ public class MetroloJ_QC_ implements PlugIn, ActionListener, Runnable {
     // a boolean used to hide info and comments fields in each individual dialogs
     boolean HideInfoAndComments=Prefs.get("MetroloJDialog_HideInfoAndComments.boolean", true);
     
-
-    
     // a boolean used to allow for the display of non verified tools
-    boolean showUnverifiedTools=Prefs.get("General_showUnverifiedTools.boolean", false);
+    boolean otherTools=Prefs.get("General_UseOtherTools.boolean", false);
     
     boolean FI=Prefs.get("QCbarFI.boolean", true);
     boolean batch=Prefs.get("QCbarBatch.boolean", true);
@@ -61,32 +59,44 @@ public class MetroloJ_QC_ implements PlugIn, ActionListener, Runnable {
     boolean CV=Prefs.get("QCbarCV.boolean", true); 
     boolean POS=Prefs.get("QCbarPos.boolean", true);
     
-    String name, path;
+    //String name, path;
+
+    // the main toolbar's window/frame title
     String title="MetroloJ_QC v"+VERSION;
-    String separator = System.getProperty("file.separator");
+    
+    // the Jframe and frame objects containing the main toolbar
     JFrame frame;
     Frame frontframe;
     
-    int xfw = 0;
-    int yfw = 0;
-    int wfw = 0;
-    int hfw = 0;
-
-    // buttons of a given toolbar/line
-    JButton [] buttons = new JButton[16];
-    int nButtonsSingleMode;
-    int nButtonsBatchMode;
-    boolean tbOpenned = false;
-    boolean grid = true;
+    // a boolean to show the grid
+    boolean grid = false;
+    
     boolean visible = true;
+    // the frame X and Y coordinates
+    int frameXCoordinate = 0;
+    int frameYCoordinate = 0;
+    int frameWidth = 0;
+    int frameHeight = 0;
+
+    // the array of JButtons containing all possible buttons used in the main toolbar
+    JButton [] buttons = new JButton[16];
+    // the number of buttons used in the "individual" upper line of the main toolbar
+    int nButtonsSingleMode;
+    
+    // the number of buttons used in the "batch" middle bar of the toolbar
+    int nButtonsBatchMode;
+    
+    boolean tbOpenned = false;
+
     boolean shouldExit = false;
     private boolean isPopup = false;
     private boolean captureMenus = true;
     private boolean isSticky = false;
     private boolean somethingWentWrong = false;
     
-    
+    // a list of preset colors that can be used to design the main toolbar's buttons
     Color[] presetColors = { new Color(255,255,255), new Color(192,192,192), new Color(213,170,213), new Color(170,170,255), new Color(170,213,255), new Color(170,213,170),new Color(255,255,170), new Color(250,224,175), new Color(255,170,170) };
+    // the background color of each individual button
     Color bgColor;
 
 /**
@@ -178,24 +188,27 @@ private void updateButtons() {
             }
         }
     }
-
+/**
+ * Designs buttons for the plugin's main toolbar.
+ * Each button is configured with a specific icon, action command, and visibility based on the index.
+ * @param i The color index used to determine the background color of the buttons.
+ * each button is stored into the buttons class variable
+ */
 private void designButtons(int i) {
         bgColor=presetColors[i];
-        //String frameiconName = "logo_RT-MFM.jpg";
-        //setBarIcon(frameiconName);   
         
         String altLabel="Field Illumination profiles from a 1 to n colors single image";
         String fullLabel="Field Illumination";
         String icon="fi.png";
         String arg="QC_Generate_FieldIlluminationReport";
-        buttons[0] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[0] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[0].setVisible(FI);
 
         altLabel="3D Resolution from subresolution bead(s) from a 1 to n color single stack";
         fullLabel="PSF Profiler";
         icon="pp.png";
         arg="QC_Generate_PSFReport";
-        buttons[1] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[1] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[1].setVisible(PP);
 
                     
@@ -203,7 +216,7 @@ private void designButtons(int i) {
         fullLabel="Mirror Z scan profile";
         icon="zp.png";
         arg="QC_Generate_zProfileReport";
-        buttons[2] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[2] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[2].setVisible(ZP);
 
 
@@ -211,28 +224,28 @@ private void designButtons(int i) {
         fullLabel="Co-Alignement";
         icon="coa.png";
         arg="QC_Generate_CoAlignementReport";
-        buttons[3] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[3] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[3].setVisible(COA);
 
         altLabel="Camera Noise from a single timelapse (may be multi-color/camera)";
         fullLabel="Camera Noise";
         icon="cam.png";
         arg="QC_Generate_CameraReport";
-        buttons[4] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[4] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[4].setVisible(CAM);
         
         altLabel="Detector Variation Coefficient from 1 to n color single image";
         fullLabel="Detector Variation Coefficient";
         icon="cv.png";
         arg="QC_Generate_CVReport";
-        buttons[5] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[5] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[5].setVisible(CV);
         
         altLabel="Jitter and repositioning accuracy (not available yet)";
         fullLabel="Jitter and repositioning accuracy";
         icon="pos.png";
         arg="";
-        buttons[6] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[6] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[6].setVisible(POS);
         buttons[6].setEnabled(false);
             
@@ -240,42 +253,42 @@ private void designButtons(int i) {
         fullLabel="Batch Field Illumination";
         icon="bfi.png";
         arg="QC_Generate_batchFieldIlluminationReport";
-        buttons[7] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[7] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[7].setVisible(FI&&batch);
         
         altLabel="Batch Resolution from PSFs from multiple datasets";
         fullLabel="Batch PSF Profiler";
         icon="bpp.png";
         arg="QC_Generate_batchPSFReport";
-        buttons[8] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[8] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[8].setVisible(PP&&batch);
         
         altLabel="Batch Co-Alignement from beads from multiple dataset";
         fullLabel="Batch Co-Alignement";
         icon="bcoa.png";
         arg="QC_Generate_batchCoAlignementReport";
-        buttons[9] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[9] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[9].setVisible(COA&&batch);
 
         altLabel="Hide ImageJ";
         fullLabel="Hide ImageJ";
         icon="hide.png";
         arg="Hide";
-        buttons[10] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[10] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[10].setVisible(true);
 
         altLabel="Close";
         fullLabel="Close";
         icon="close.png";
         arg="Close";
-        buttons[11] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[11] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[11].setVisible(true);
 
          altLabel="Test & Debug";
         fullLabel="Test & Debug";
         icon="test.png";
         arg="Test";
-        buttons[12] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[12] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[12].setVisible(true);
         if (!showDebugOptions) buttons[12].setVisible(false);
         
@@ -283,24 +296,29 @@ private void designButtons(int i) {
         fullLabel="Configure";
         icon="config.png";
         arg="Configure";
-        buttons[13] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[13] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[13].setVisible(true);
         
         altLabel="Open manual";
         fullLabel="Open manual";
         icon="manual.png";
         arg="Manual";
-        buttons[14] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[14] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[14].setVisible(true);
         
         altLabel="About MetroloJ_QC";
         fullLabel="About MetroloJ_QC";
         icon="about.png";
         arg="About";
-        buttons[15] = makeNavigationButton(icon, arg, altLabel, fullLabel, bgColor);
+        buttons[15] = makeNavigationButton(icon, arg, altLabel, fullLabel);
         buttons[15].setVisible(true);
-        
     }
+/**
+ * Designs the line/buttons scheme panel of the plugin's main toolbar. 
+ * Configures and adds Jtoolbars with the appropriate buttons based on 
+ * the configuration. Adds the JToolbars to the plugin's main toolbar's frame 
+ * (= frame class variable)
+ */
     private void designPanel() {
         JToolBar [] toolBar = new JToolBar[3];
         toolBar [0] = new JToolBar();
@@ -380,7 +398,14 @@ private void designButtons(int i) {
         toolBar[2].add(buttons[15]);
         addBarLine(toolBar[2], 5);
     }
-
+/**
+ * Adds a toolbar line to the main toolbar's frame (=the frame class variable), 
+ * containing the specified number of buttons.
+ * The toolbar can be customized with a specific layout and appearance.
+ * @param bar The JToolBar to be added to the main frame.
+ * @param nButtons The number of buttons to be added to the toolbar.
+ * If zero, the toolbar is not added.
+ */
     private void addBarLine(JToolBar bar, int nButtons) {
         if (nButtons!=0){
             bar.setFloatable(false);
@@ -389,8 +414,15 @@ private void designButtons(int i) {
             frame.getContentPane().add(bar);
             }
     }
-        
-    protected JButton makeNavigationButton(String iconName, String actionCommand, String toolTipText, String altText, Color color) {
+ /**
+ * Creates a JButton with an icon, action command, tooltip text, and background color.The icon is loaded from a specified file, and the button's appearance and functionality are configured accordingly.
+ * @param iconName       The name of the icon file to be used for the button.
+ * @param actionCommand  The action command associated with the button.
+ * @param toolTipText    The tooltip text to display when the user hovers over the button.
+ * @param altText        The alternate text to display if the icon is not available.
+ * @return A configured JButton with the specified attributes and an ActionListener.
+ */    
+    protected JButton makeNavigationButton(String iconName, String actionCommand, String toolTipText, String altText) {
         
         String fileName = "images/"+ iconName;
 
@@ -399,7 +431,7 @@ private void designButtons(int i) {
         try {
             image=ImageIO.read(is);
         } catch (IOException ex) {
-            Logger.getLogger(MetroloJ_QC_.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(MetroloJ_QC.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         JButton button = new JButton();
@@ -414,7 +446,12 @@ private void designButtons(int i) {
         button.setBackground(bgColor);
         return button;
     }
-
+/**
+ * Handles actions performed by the user.
+ * Based on the action command, initiates appropriate actions like generating reports or displaying information.
+ *
+ * @param e The ActionEvent triggered by user actions.
+ */
     public void actionPerformed(ActionEvent e) {
         String cmd = e.getActionCommand();
         switch (cmd){
@@ -476,7 +513,7 @@ private void designButtons(int i) {
                     Files.copy(is, tempFile, StandardCopyOption.REPLACE_EXISTING);
                     Desktop.getDesktop().open(tempFile.toFile());
                 } catch (IOException ex) {
-                    Logger.getLogger(MetroloJ_QC_.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(MetroloJ_QC.class.getName()).log(Level.SEVERE, null, ex);
                 }
                 break;
                 case "About" :
@@ -491,47 +528,25 @@ private void designButtons(int i) {
 	}
 
     }       
-
+/**
+ * changes the visible status of the main MetroloJ_QC toolbar
+ */
     private void toggleIJ() {
         IJ.getInstance().setVisible(!IJ.getInstance().isVisible());
         visible = IJ.getInstance().isVisible();
     }
 
-    private void hideIJ() {
-        IJ.getInstance().setVisible(false);
-        visible = false;
-    }
-
+/**
+ * Saves the main MetroloJ_QC toolbar location
+ */
     protected void rememberXYlocation() {
         Prefs.set("QCbar" + title + ".xloc", frame.getLocation().x);
         Prefs.set("QCbar" + title + ".yloc", frame.getLocation().y);
     }
 
-    private void setABasMain() {
-        frame.addWindowListener(new WindowAdapter() {
-            public void windowClosing(WindowEvent e) {
-                rememberXYlocation();
-                e.getWindow().dispose();
-                IJ.run("Quit");
-            }
-        });
-    }
-
-
-
-    private void setBarIcon(String iconName) {
-        try {
-            String imgLocation = "images"+ File.separator + iconName;
-            URL imageURL = getClass().getResource(imgLocation);
-            Image img=Toolkit.getDefaultToolkit().getImage(imageURL);
-            if (img!=null) frame.setIconImage(img);
-        } 
-        catch (Exception fe) {IJ.error("Error creating the bar's icon");}
-}
-
-    private void setOnTop() {
-        frame.setAlwaysOnTop(true);
-    }
+    /**
+     * Closes the main MetroloJ_QC bar
+     */
     private void closeQCBar() {
 	frame.dispose();
 	WindowManager.removeWindow(frame);
@@ -539,6 +554,9 @@ private void designButtons(int i) {
 	shouldExit = true;
     }
     
+    /**
+     * Displays the configuration window
+     */
     private void configureQCBar() {
         GenericDialog gd = new GenericDialog("MetroloJ_QC Bar Configuration");
         gd.addCheckbox("Show Batch tools", batch);
@@ -555,6 +573,7 @@ private void designButtons(int i) {
         gd.addMessage("Stage tools");
         gd.addCheckbox("Position (uses timelapses of 1 um beads) Not available yet", POS);
         gd.addMessage("MetroloJ_QC dialogs configuration");
+        gd.addCheckbox("Use (unverified) other tools", otherTools);
         gd.addCheckbox("Hide information/comments fields", HideInfoAndComments);
         gd.addCheckbox("Use scrollBars windows", scrollBarsOptions);
         gd.addCheckbox("Show the debug options", debugMode);
@@ -569,6 +588,7 @@ private void designButtons(int i) {
         CV=gd.getNextBoolean();
         CAM=gd.getNextBoolean();
         POS=gd.getNextBoolean();
+        otherTools=gd.getNextBoolean();
         HideInfoAndComments=gd.getNextBoolean();
         scrollBarsOptions=gd.getNextBoolean();
         debugMode=gd.getNextBoolean();
@@ -580,6 +600,7 @@ private void designButtons(int i) {
         Prefs.set("QCbarCAM.boolean", CAM); 
         Prefs.set("QCbarCV.boolean", CV);
         Prefs.set("QCbarPOS.boolean", CV);
+        Prefs.set("General_UseOtherTools.boolean", otherTools);
         Prefs.set("MetroloJDialog_HideInfoAndComments.boolean",HideInfoAndComments);
         Prefs.set("General_scrollBars.boolean",scrollBarsOptions);
         Prefs.set("General_debugMode.boolean",debugMode);
@@ -591,8 +612,12 @@ private void designButtons(int i) {
         designPanel();
         displayFrame();
     }
+ /**
+ * Initializes the main MetroloJ_QC toolbar's frame.
+ * Configures the frame properties, title, appearance, event listeners, and default behavior.
+ * Sets up window listener for saving position, capturing menus, and responding to window events.
+ */ 
     void initializeFrame() {
-
         if (IJ.isMacintosh()) try {UIManager.setLookAndFeel(new MetalLookAndFeel());}
             catch(Exception e) {}
         frame.setTitle(title);
@@ -624,10 +649,10 @@ private void designButtons(int i) {
     
     frontframe = WindowManager.getFrontWindow();
     if (frontframe != null){
-	xfw = frontframe.getLocation().x;
-	yfw = frontframe.getLocation().y;
-	wfw = frontframe.getWidth();
-	hfw = frontframe.getHeight();
+	frameXCoordinate = frontframe.getLocation().x;
+	frameYCoordinate = frontframe.getLocation().y;
+	frameWidth = frontframe.getWidth();
+	frameHeight = frontframe.getHeight();
     }
 // toolbars will be added as lines in a n(0) rows 1 column layout
     frame.getContentPane().setLayout(new GridLayout(0, 1));
@@ -639,7 +664,9 @@ private void designButtons(int i) {
     frame.setFocusable(true);
     frame.addKeyListener(IJ.getInstance());
     }
-
+/**
+ * Displays the "about MetroloJ_QC" window
+ */
     public void showAbout() {
         Double zoom=0.7D;
         String fileName = "images/QC.png"; 
@@ -648,7 +675,7 @@ private void designButtons(int i) {
         try {
             image=ImageIO.read(is);
         } catch (IOException ex) {
-            Logger.getLogger(MetroloJ_QC_.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(MetroloJ_QC.class.getName()).log(Level.SEVERE, null, ex);
         }
         
         ImagePlus img=new ImagePlus("", image);
@@ -674,7 +701,7 @@ private void designButtons(int i) {
                 try {
                     bl.openURL("https://repo1.maven.org/maven2/com/itextpdf/itextpdf/5.5.13.2/itextpdf-5.5.13.2.jar");
                 } catch (IOException ex) {
-                    Logger.getLogger(MetroloJ_QC_.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(MetroloJ_QC.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
         });
@@ -682,7 +709,11 @@ private void designButtons(int i) {
         gd.hideCancelButton();
         gd.showDialog();
     }
-
+/**
+ * Displays the main frame window.
+ * Sets up the frame properties, position, and visibility
+ * Handles various scenarios including pop-up, sticky behavior, and responding to user input.
+ */
     void displayFrame(){
         // setup the frame, and display it
     frame.setResizable(false);
@@ -722,11 +753,11 @@ private void designButtons(int i) {
                     try {
                         ImageWindow fw = WindowManager.getCurrentWindow();
 			if (fw == null) frame.setVisible(false);
-			if ((fw != null) && (fw.getLocation().x != xfw)|| (fw.getLocation().y != yfw)|| (fw.getWidth() != wfw)|| (fw.getHeight() != hfw)) {
-                            xfw = fw.getLocation().x;
-			    yfw = fw.getLocation().y;
-			    wfw = fw.getWidth();
-			    hfw = fw.getHeight();
+			if ((fw != null) && (fw.getLocation().x != frameXCoordinate)|| (fw.getLocation().y != frameYCoordinate)|| (fw.getWidth() != frameWidth)|| (fw.getHeight() != frameHeight)) {
+                            frameXCoordinate = fw.getLocation().x;
+			    frameYCoordinate = fw.getLocation().y;
+			    frameWidth = fw.getWidth();
+			    frameHeight = fw.getHeight();
 			    stickToActiveWindow();
 			}
                     } catch (Exception e) {
@@ -740,6 +771,7 @@ private void designButtons(int i) {
     }
     }
     @Override
+    
     public void run() {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }

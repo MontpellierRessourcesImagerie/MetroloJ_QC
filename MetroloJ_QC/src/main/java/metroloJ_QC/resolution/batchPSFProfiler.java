@@ -21,6 +21,12 @@ public class batchPSFProfiler {
 public static final int X = 0;
 public static final int Y = 1;
 public static final int Z = 2;
+public static final int AVERAGE_RES=0;
+public static final int SD_RES=1;
+public static final int THEORETICAL_RES=2;
+public static final int SAMPLE_SIZE=3;
+public static final int AVERAGE_R2=4;
+public static final int AVERAGE_SBR=5;
  
  // stores all generated PSFprofiler objects
  ArrayList<PSFprofiler> pps;
@@ -49,12 +55,19 @@ public static final int Z = 2;
   public String[][] samplingProportion;
   
   // a [channel] array that stores, for a given dimension, lists of FWHM values of 
-  // each PSFprofiler object analysed. rawXRes[i].get(k) gives the x resolution 
-  // value for channel i of the kth PSFProfiler within the pps list (i.e. this kth PSFProfiler object's res[i][0])
-  List<Double>[] rawXRes;
-  List<Double>[] rawYRes;
-  List<Double>[] rawZRes;
+  // each PSFprofiler object analysed. rawXRes[i].get(k) gives the x beadResolution 
+  // values for channel i of the kth PSFProfiler within the pps list
+  List<beadResolutionValues>[] rawXRes;
+  List<beadResolutionValues>[] rawYRes;
+  List<beadResolutionValues>[] rawZRes;
   
+  // a [channel] array that stores, for a given dimension, lists of valid FWHM values of 
+  // each PSFprofiler object analysed. XRes[i].get(k) gives beadResolution 
+  // values along the X axis for channel i of the kth PSFProfiler valid analysis
+  List<beadResolutionValues>[] XRes;
+  List<beadResolutionValues>[] YRes;
+  List<beadResolutionValues>[] ZRes;
+  /**
   // a [channel] array that stores, for a given dimension, a list of fit goodness values of 
   // each PSFprofiler object analysed. rawXR2[i].get(k) gives, for channel i, the fit goodness value associated
   // with the XProfile fit of the kth PSFProfiler within the pps list (i.e. this kth PSFProfiler object's xR2[i])
@@ -66,12 +79,15 @@ public static final int Z = 2;
   // each PSFprofiler object analysed. rawSBR[i].get(k) gives, for channel i, the SBR ratio associated
   // with bead analysed in the kth PSFProfiler within the pps list (i.e. this kth PSFProfiler object's SBRatio[i])
   List<Double> [] rawSBR;
-  
+  */
 // stores the final resolution (FWHM) table of the report
   public content[][] finalResolutionsSummary=null;
   
  // stores the final resolution ratio table of the report
   public content[][] finalRatiosSummary=null;
+  
+  //Double Array containing the average resolution values. finalResolutionTable[i][X, Y or Z] contains an
+  // array of resolution values along the X axis for channel i. [channel][X, Y, Z]
   
   Double[][][] finalResolutionTable;
   
@@ -90,72 +106,47 @@ public static final int Z = 2;
     this.mjd.getAnalysisParametersSummary(path);
   }  
   /**
-   * Compiles all PSFProfiler analyses generated. Populates all raw class variables
-   * (raw resolution in all 3 dimensions, associated fit goodness values and signal
-   * to background ratios. Generates the saturation proportion
+   * Aggregates all PSFProfiler analyses generated. Populates all rawRes class variables
+   * Each contains beadResolutionValues for a given dimension (raw FWHM/resolution, associated
+   * fit goodness values and signal to background ratios). Generates the saturation proportion
    * data used in the modified microscope info table
    */
   public void aggregatePPs(int dimension) {
-    List[] arrayOfList1 = new List[mjd.emWavelengths.length];
-    List[] arrayOfList2 = new List[mjd.emWavelengths.length];
-    List[] arrayOfList3 = new List[mjd.emWavelengths.length];
     for (int i = 0; i < mjd.emWavelengths.length; i++) {
-      List<Double> tempRes = new ArrayList<>();
-      List<Double> tempR2 = new ArrayList<>();
-      List<Double> tempSBR = new ArrayList<>();
-      for (int m = 0; m < pps.size(); m++) {
-        tempSBR.add((Double)pps.get(m).SBRatio[i]);
-        if (mjd.debugMode) IJ.log("(in BPPReport>aggregate PPRs)channel "+i+", dimension:"+dimension+", bead "+m+", res "+pps.get(m).res[i][dimension]);    
-        tempRes.add(Double.valueOf(((PSFprofiler)pps.get(m)).res[i][dimension]));
-        
+        List<beadResolutionValues> tempBRVs = new ArrayList<>();
+        for (int m = 0; m < pps.size(); m++) {
+            tempBRVs.add(new beadResolutionValues(Double.valueOf(((PSFprofiler)pps.get(m)).res[i][dimension]),Double.valueOf(pps.get(m).fittedValues[i][dimension].R2),(Double)pps.get(m).SBRatio[i]));
+        }
         switch (dimension) {
-          case 0:
-            tempR2.add(Double.valueOf(pps.get(m).fittedValues[i][0].R2));
-            break;
-          case 1:
-            tempR2.add(Double.valueOf(pps.get(m).fittedValues[i][1].R2));
-            break;
-          case 2:
-            tempR2.add(Double.valueOf(pps.get(m).fittedValues[i][2].R2));
-            break;
-        } 
-      } 
-      arrayOfList1[i] = tempRes;
-      arrayOfList2[i] = tempR2;
-      arrayOfList3[i] = tempSBR;      
-    } 
-    rawSBR=(List<Double>[]) arrayOfList3;
-    switch (dimension) {
-      case 0:
-        this.rawXRes = (List<Double>[])arrayOfList1;
-        this.rawXR2 = (List<Double>[])arrayOfList2;
+        case 0:
+            this.rawXRes[i] = tempBRVs;
         break;
-      case 1:
-        this.rawYRes = (List<Double>[])arrayOfList1;
-        this.rawYR2 = (List<Double>[])arrayOfList2;
+        case 1:
+            this.rawYRes [i] = tempBRVs;
         break;
-      case 2:
-        this.rawZRes = (List<Double>[])arrayOfList1;
-        this.rawZR2 = (List<Double>[])arrayOfList2;
+        case 2:
+            this.rawZRes[i] = tempBRVs;
         break;
-    } 
+        }
+    }    
     List<microscope> micros = new ArrayList<>();
-    for (int j = 0; j < pps.size(); ) {
-      micros.add(((PSFprofiler)pps.get(j)).micro);
-      j++;
-    } 
+    for (int j = 0; j < pps.size(); j++ ) micros.add(((PSFprofiler)pps.get(j)).micro);
     List<double[]> saturations = (List)new ArrayList<>();
     for (int k = 0; k < pps.size(); ) {
       saturations.add(((PSFprofiler)pps.get(k)).saturation);
       k++;
     } 
-
     this.saturationProportion = doCheck.compileProportionOfUnsaturatedImages(saturations);
     this.samplingProportion = doCheck.compileProportionOfCorrectlySampledImages(micros);
-    if (mjd.debugMode) IJ.log("(in BPP report>aggregate) rawSBR[0] length "+rawSBR[0].size());
     if (mjd.debugMode) IJ.log("(in BPP report>aggregate) rawXRes[0] length "+rawXRes[0].size());
-    }
-  
+}
+  /**
+   * Compiles all PSFProfiler analyses generated. Takes each beadResolutionValues
+   * for the three dimension, analyses for each channel whether the bead's R2 fit goodness value
+   * is too low. Then gets outlier values, flags them as such and removes them
+   * from the rawRes list 
+   * 
+   */
   public void compilePPs() {
     Double[][][] temp = new Double[mjd.emWavelengths.length][3][5];
     for (int i = 0; i < mjd.emWavelengths.length; i++) {
@@ -163,81 +154,83 @@ public static final int Z = 2;
         switch (dim) {
           case 0:
             if (mjd.debugMode) IJ.log("(in BPPReport>compile PPRs)channel "+i+", dimension: X");
-            temp[i][dim] = filterList(this.rawXRes[i], this.rawXR2[i],this.rawSBR[i], mjd);
+            temp[i][dim] = filterBeads(this.rawXRes[i], mjd);
             break;
           case 1:
             if (mjd.debugMode) IJ.log("(in BPPReport>compile PPRs)channel "+i+", dimension: Y");  
-            temp[i][dim] = filterList(this.rawYRes[i], this.rawYR2[i],this.rawSBR[i], mjd);
+            temp[i][dim] = filterBeads(this.rawYRes[i], mjd);
             break;
           case 2:
            if (mjd.debugMode)IJ.log("(in BPPReport>compile PPRs)channel "+i+", dimension: Z");  
-            temp[i][dim] = filterList(this.rawZRes[i], this.rawZR2[i],this.rawSBR[i], mjd);
+            temp[i][dim] = filterBeads(this.rawZRes[i], mjd);
             break;
         } 
-        temp[i][dim][2] = Double.valueOf(((double[])this.genericMicro.resolutions.get(i))[dim]);
+        temp[i][dim][THEORETICAL_RES] = Double.valueOf(((double[])this.genericMicro.resolutions.get(i))[dim]);
       } 
     } 
     this.finalResolutionTable = temp;
   }
   /**
- * Filters and processes lists of resolution (res), R2 values, and signal-to-background ratio (SBR) to calculate statistics.
+ * Filters and processes a lists of bead resolution values and calculate statistics.
  *
- * This method takes three lists containing resolution (res), fit goodness R2 values, and signal-to-background ratio (SBR) respectively,
- * along with a metroloJDialog object for debug and outlier handling. For each element of the list, it associates
- * FWHM, R2 and SBR into a single list and processes the input lists, removing outliers if required,
- * and calculates various statistics such as mean and standard deviation.
+ * This method takes a list of beadResolutionValues objects (=containing resolution (res),
+ * fit goodness (R2) values, and signal-to-background ratio (SBR) respectively. 
+ * The list is filtered from aberrant low R2 values (using the metroloJDialog R2Threshold variable
+ * depending of the configuration, outliers resolution values are removed and 
+ * various statistics such as mean and standard deviation of FHWM and R2/SBR values
+ * are calculated.
  *
- * @param resList The list of resolution values.
- * @param r2List The list of R2 values.
- * @param sbrList The list of signal-to-background ratio (SBR) values.
+ * @param beadList The list of beadResolution values to be filtered.
  * @param mjd The metroloJDialog object providing settings for processing.
  * @return A Double array containing calculated statistics: [mean_res, sd_res, NaN, count_res, mean_R2, mean_SBR]
  */
-  public static Double[] filterList(List<Double> resList, List<Double> r2List, List<Double> sbrList, metroloJDialog mjd) {
+  public static Double[] filterBeads(List<beadResolutionValues> beadList, metroloJDialog mjd) {
     Double[] output = new Double[6];
-    Double[][] temp = new Double [resList.size()][3];
-     if (mjd.debugMode) IJ.log("(in BPP report>filterList) resList length "+resList.size()+", r2List length "+r2List.size()+"sbrList length "+sbrList.size());
-    if (!resList.isEmpty()){
-        for (int k = 0; k < resList.size(); k++) {
-            Double [] combi=new Double[3];
-            combi[0]=resList.get(k);
-            combi[1]=r2List.get(k);
-            combi[2]=sbrList.get(k);
-            temp[k]=combi;
-        }    
-        List[] resR2Sbr = dataTricks.purge2(temp);
-        if (mjd.outliers){
-            List[]input= new List[3];
-            List<Double> temp0 = new ArrayList<>();
-            List<Double> temp1 = new ArrayList<>();
-            List<Double> temp2 = new ArrayList<>();
-            for (int i=0; i<resR2Sbr[0].size(); i++){
-                temp0.add((Double)resR2Sbr[0].get(i));
-                temp1.add((Double)resR2Sbr[1].get(i));
-                temp2.add((Double)resR2Sbr[2].get(i));
-            }
-            input[0]=temp0;
-            input[1]=temp1;
-            input[2]=temp2;
-            resR2Sbr[0].clear();
-            resR2Sbr[1].clear();
-            resR2Sbr[2].clear();
-            List[] outliersOutput = dataTricks.removeOutliers2(input);
-            resR2Sbr[0]=outliersOutput[0];
-            resR2Sbr[1]=outliersOutput[1];
-            resR2Sbr[2]=outliersOutput[2];
+    if (!beadList.isEmpty()) {
+        for (int k = 0; k < beadList.size(); k++) {
+            if (beadList.get(k).R2<mjd.R2Threshold || beadList.get(k).res.isNaN()) beadList.get(k).filtered=true;
         }
-        output[0] = dataTricks.getMean(resR2Sbr[0]);
-        output[1] = Double.valueOf(dataTricks.getSD(resR2Sbr[0]));
-        output[2] = Double.valueOf(Double.NaN);
-        output[3] = Double.valueOf(resR2Sbr[0].size());
-        output[4]=Double.valueOf(dataTricks.getMean(resR2Sbr[1]));
-        output[5]=Double.valueOf(dataTricks.getMean(resR2Sbr[2]));
+        if (mjd.outliers)tagOutliers(beadList);
+        List<Double> filteredResList= new ArrayList();
+        List<Double> filteredR2List= new ArrayList();
+        List<Double> filteredSBRList= new ArrayList();
+        for (int k = 0; k < beadList.size(); k++) {
+            if(!beadList.get(k).filtered && !beadList.get(k).outlier) {
+                filteredResList.add(beadList.get(k).res);
+                filteredR2List.add(beadList.get(k).R2);
+                filteredSBRList.add(beadList.get(k).SBR);
+            }
+        }
+        
+    output[AVERAGE_RES] = dataTricks.getMean(filteredResList);
+    output[SD_RES] = Double.valueOf(dataTricks.getSD(filteredResList));
+    output[2] = Double.valueOf(Double.NaN);
+    output[SAMPLE_SIZE] = Double.valueOf(filteredResList.size());
+    output[AVERAGE_R2]=Double.valueOf(dataTricks.getMean(filteredR2List));
+    output[AVERAGE_SBR]=Double.valueOf(dataTricks.getMean(filteredSBRList));
     }
     else {
         for (int i=0; i<6; i++)output[i]=Double.NaN;
     }
     return output;
+  }
+  /**
+   * Identifies outliers resolution values among the non-filtered beadResolutionValues' resolution values
+   * @param beadList : beadResolutionValues objects list of bead resolution values
+   */
+  public static void tagOutliers(List<beadResolutionValues> beadList){
+    List[] output = new List[2];
+    List<Integer> indices=new ArrayList<>();
+    List<Double> filteredRes=new ArrayList<>();
+    List<Double> temp2=new ArrayList<>();
+    for (int k = 0; k < beadList.size(); k++) {
+        if (!beadList.get(k).filtered) {
+            indices.add(k);
+            filteredRes.add(beadList.get(k).res);
+        }
+    }
+    List<Integer> filteredResOutliersIndices=dataTricks.getOutliersIIndices(filteredRes);
+    for (int k=0; k<filteredResOutliersIndices.size(); k++) beadList.get(indices.get(filteredResOutliersIndices.get(k))).outlier=true; 
   }
  /**
  * Generates the final resolutions table (that contains compiled values).
@@ -259,8 +252,8 @@ public static final int Z = 2;
       for (int j=1; j<6; j++) output[6*i+1+j][0]=new content();
       output[6*i + 1][1]=new content("average FWHM ("+IJ.micronSymbol+"m)",content.TEXT);
       output[6*i + 2][1]=new content("FWHM std dev ("+IJ.micronSymbol+"m)",content.TEXT);
-      output[6*i + 3][1]=new content("number of beads",content.TEXT);
-      output[6*i + 4][1]=new content("theoretical value ("+IJ.micronSymbol+"m)",content.TEXT);
+      output[6*i + 3][1]=new content("theoretical value ("+IJ.micronSymbol+"m)",content.TEXT);
+      output[6*i + 4][1]=new content("number of beads",content.TEXT);
       output[6*i + 5][1]=new content("mean R2 value",content.TEXT);
       output[6*i + 6][1]=new content("mean SBR value",content.TEXT);
       for (int dim = 0; dim < 3; dim++) {
@@ -269,14 +262,14 @@ public static final int Z = 2;
           for (int j=1; j<6; j++) output[6*i+1+j][dim+2]=new content();
         } 
         else {
-          output[6*i + 1][dim + 2] = new content("" + dataTricks.round(this.finalResolutionTable[i][dim][0].doubleValue(), 3), content.TEXT);
-          if (!this.finalResolutionTable[i][dim][1].isNaN()) output[6*i + 2][dim + 2]=new content(""+dataTricks.round(this.finalResolutionTable[i][dim][1].doubleValue(), 3),content.TEXT);
+          output[6*i + 1][dim + 2] = new content("" + dataTricks.round(this.finalResolutionTable[i][dim][AVERAGE_RES].doubleValue(), 3), content.TEXT);
+          if (!this.finalResolutionTable[i][dim][SD_RES].isNaN()) output[6*i + 2][dim + 2]=new content(""+dataTricks.round(this.finalResolutionTable[i][dim][SD_RES].doubleValue(), 3),content.TEXT);
           else output[6*i + 2][dim + 2]=new content("-",content.TEXT);
-          output[6*i + 3][dim +2]=new content("" + (int)this.finalResolutionTable[i][dim][3].doubleValue(), content.TEXT);
-          output[6*i + 4][dim +2]=new content("" + dataTricks.round(this.finalResolutionTable[i][dim][2].doubleValue(), 3),content.TEXT);
-          output[6*i + 5][dim +2]=new content("" + dataTricks.round(this.finalResolutionTable[i][dim][4].doubleValue(), 2),content.TEXT);
+          output[6*i + 3][dim +2]=new content("" + (int)this.finalResolutionTable[i][dim][THEORETICAL_RES].doubleValue(), content.TEXT);
+          output[6*i + 4][dim +2]=new content("" + dataTricks.round(this.finalResolutionTable[i][dim][SAMPLE_SIZE].doubleValue(), 3),content.TEXT);
+          output[6*i + 5][dim +2]=new content("" + dataTricks.round(this.finalResolutionTable[i][dim][AVERAGE_R2].doubleValue(), 2),content.TEXT);
           switch(dim) {
-              case 0 : output[6*i + 6][2]=new content(""+ dataTricks.round(this.finalResolutionTable[i][dim][5].doubleValue(), 2),content.TEXT,1,3);
+              case 0 : output[6*i + 6][2]=new content(""+ dataTricks.round(this.finalResolutionTable[i][dim][AVERAGE_SBR].doubleValue(), 2),content.TEXT,1,3);
               break;
               default : output[6*i + 6][dim+2]=new content();
               break;
@@ -330,7 +323,7 @@ public static final int Z = 2;
    * @return a content table
    */
   public content [][] getRawResolutionValues(int dimension) {
-    int rows = 3 * this.genericMicro.emWavelengths.length + 1;
+    int rows = 4 * this.genericMicro.emWavelengths.length + 1;
     int cols = pps.size() + 2;
     content [][] output = new content [rows][cols];
     output[0][0] = new content("Channel",content.TEXT,1,2);
@@ -343,24 +336,29 @@ public static final int Z = 2;
       output[3*i + 1][0] = new content("Channel"+i, content.TEXT,3,1);
       output[3*i+2][0]=new content();
       output[3*i+3][0]=new content();
+      output[3*i+4][0]=new content();
       output[3*i+1][1]=new content ("FWHM ("+IJ.micronSymbol+"m)",content.TEXT);
       output[3*i+2][1]=new content ("R2",content.TEXT);
       output[3*i+3][1]=new content ("SBR",content.TEXT);
+      output[3*i+4][1]=new content ("STATUS",content.TEXT);
       
       for (int m = 0; m < pps.size(); m++) {
-        output[3*i + 3][m + 2] = new content("" + this.rawSBR[i].get(m),content.TEXT);
+        output[3*i + 3][m + 2] = new content("" + this.rawXRes[i].get(m).SBR,content.TEXT);
         switch (dimension) {
           case 0:
-            output[3*i + 1][m + 2] = new content("" + this.rawXRes[i].get(m),content.TEXT);
-            output[3*i + 2][m + 2] = new content("" + this.rawXR2[i].get(m),content.TEXT);
+            output[3*i + 1][m + 2] = new content("" + this.rawXRes[i].get(m).res,content.TEXT);
+            output[3*i + 2][m + 2] = new content("" + this.rawXRes[i].get(m).R2,content.TEXT);
+            output[3*i + 3][m + 2] = new content("" + this.rawXRes[i].get(m).getStatus(),content.TEXT);
             break;
           case 1:
-            output[3*i + 1][m + 2] = new content( "" + this.rawYRes[i].get(m),content.TEXT);
-            output[3*i + 2][m + 2] = new content( "" + this.rawYR2[i].get(m),content.TEXT);
+            output[3*i + 1][m + 2] = new content("" + this.rawYRes[i].get(m).res,content.TEXT);
+            output[3*i + 2][m + 2] = new content("" + this.rawYRes[i].get(m).R2,content.TEXT);
+            output[3*i + 3][m + 2] = new content("" + this.rawYRes[i].get(m).getStatus(),content.TEXT);
             break;
           case 2:
-            output[3*i + 1][m + 2] = new content( "" + this.rawZRes[i].get(m),content.TEXT);
-            output[3*i + 2][m + 2] = new content( "" + this.rawZR2[i].get(m),content.TEXT);
+            output[3*i + 1][m + 2] = new content("" + this.rawZRes[i].get(m).res,content.TEXT);
+            output[3*i + 2][m + 2] = new content("" + this.rawZRes[i].get(m).R2,content.TEXT);
+            output[3*i + 3][m + 2] = new content("" + this.rawZRes[i].get(m).getStatus(),content.TEXT);
           break;
         } 
       } 

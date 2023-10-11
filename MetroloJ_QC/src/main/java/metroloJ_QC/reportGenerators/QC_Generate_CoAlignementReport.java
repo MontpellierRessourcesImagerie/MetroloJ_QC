@@ -9,6 +9,7 @@ import ij.plugin.PlugIn;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import metroloJ_QC.coalignement.coAlignement;
@@ -111,7 +112,7 @@ public class QC_Generate_CoAlignementReport implements PlugIn {
                     if (mjd.debugMode) IJ.log("(in GenerateCoalignmentReport) beadsfeatures"+i+": "+beadsFeatures.get(i));
                     roiImage.close();
                 }
-                int firstValidBead=imageTricks.findFirstCOAResult(beadsCoas);
+                int firstValidBead=findFirstCOAResult(beadsCoas);
                 if (mjd.debugMode) IJ.log("(in GenerateCoalignmentReport) first valid bead:" +firstValidBead);
                 /*beadOverlay=imageTricks.StampResultsMultipleBeadsMode(beadOverlay, firstValidBead,dataTricks.getLessDoubles(coords,2),beadsFeatures, mjd,0);
                 if (mjd.debugMode) beadOverlay.show();
@@ -147,4 +148,17 @@ public class QC_Generate_CoAlignementReport implements PlugIn {
     } 
     imageTricks.restoreOriginalCal(mjd.ip);
   }
+  /**
+   * Finds the first beadCoAlignement that was successfully analysed (=went through
+   * the preliminary checks)
+   * @param beadsCoas: the list of identified bead's coAlignements
+   * @return the list ID of the bead
+   */
+  public static int findFirstCOAResult(List<coAlignement> beadsCoas){
+        int output=-1;
+        for (int n=0; n<beadsCoas.size(); n++){
+            if (beadsCoas.get(n).result)return(n);   
+        }
+      return(output);
+    }
 }

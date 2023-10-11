@@ -680,6 +680,5 @@ private boolean isOutlier(int combination, int coaID){
     if (this.mjd.analysisParametersSummary==null) this.mjd.getAnalysisParametersSummary(path);
     fileTricks.save(getResultSpreadsheetString(), path + "bcoa_summary.xls");
     fileTricks.save(getRawDataSpreadsheetString(), path + "bcoa_rawData.xls");
-    
   }
 }

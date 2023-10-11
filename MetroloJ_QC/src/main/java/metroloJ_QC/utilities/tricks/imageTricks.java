@@ -25,34 +25,43 @@ import metroloJ_QC.resolution.PSFprofiler;
 import metroloJ_QC.setup.metroloJDialog;
 
 public class imageTricks {
+  // final variables used to code the dimension (Z, C, T) to be used
+  public static final int Z = 0;
+  public static final int C = 1;
+  public static final int T = 2;
+  // final variables to code colors
   public static final Color[] COLORS = new Color[] { Color.red, Color.green, Color.blue, Color.magenta, Color.yellow, Color.cyan };
-  
   public static final String[] COLOR_NAMES = new String[] { "Red", "Green", "Blue", "Magenta", "Yellow", "Cyan" };
   
+  //a variable factor used to determine the position of an item (e.g. scale bar) with respect to the image's size
+  // for instance, when a scaleBar is to be added to the bottom right corner of the image, the scaleBar's X position
+  // can be calculated using a fraction of the image's width
   public static int fraction = 20;
   
+  //the height of a scaleBar in pixels
   public static int barHeightInPixels = 4;
   
+  // final variable that specify the position of an item (e.g. scale bar)
   public static final int BOTTOM_RIGHT = 0;
-  
   public static final int BOTTOM_LEFT = 1;
   
+  // fontSize applied to any text that is added with the class' methods
   public static int fontSize = 12;
   
+  // a Calibration object storing (local/global) Calibration values when tempRemoveGlobalCal is used
   public static Calibration globalCal = null;
-  
   public static Calibration localCal = null;
   
-  public static final int Z = 0;
-  
-  public static final int C = 1;
-  
-  public static final int T = 2;
-  
+  //final variables used to code how the text should be justified
   public static final int JUSTIFICATION_RIGHT=0;
-  
   public static final int JUSTIFICATION_LEFT=1;
   
+ /**
+ * Converts the calibration unit and values of the current ImagePlus to micrometers (um).
+ * If the calibration unit is originally in nanometers (nm), it is converted to micrometers (um)
+ * and the corresponding pixel values are adjusted accordingly.
+ * The changes are applied to the current ImagePlus.
+ */
   public static void convertCalibration() {
     ImagePlus ip = WindowManager.getCurrentImage();
     Calibration cal = ip.getCalibration();
@@ -66,19 +75,64 @@ public class imageTricks {
     } 
     ip.setCalibration(cal); 
   }
-  
+ /**
+ * Temporarily removes the global calibration from the specified ImagePlus.
+ * This method sets the image's global calibration to null while preserving the local calibration,
+ * effectively using the local calibration or the global calibration (if local is null) for measurements.
+ *
+ * @param ip The ImagePlus instance from which to temporarily remove the global calibration.
+ */
   public static void tempRemoveGlobalCal(ImagePlus ip) {
     localCal = ip.getLocalCalibration();
     globalCal = ip.getGlobalCalibration();
     ip.setGlobalCalibration(null);
     ip.setCalibration((localCal == null) ? globalCal : localCal);
   }
-  
+  /**
+   * Applies the globalCal and localCal class variables to the input ImagePlus
+   * @param ip: input imagePlus
+   */
   public static void restoreOriginalCal(ImagePlus ip) {
     ip.setGlobalCalibration(globalCal);
     ip.setCalibration(localCal);
   }
-  
+  /**
+   * Copies the image's pixel depth, height, width values from an input image 
+   * to a destination image
+   * @param sourceImage
+   * @param destinationImage 
+   */
+  public static void transferCal(ImagePlus sourceImage, ImagePlus destinationImage) {
+    Calibration calIn = sourceImage.getCalibration();
+    Calibration calOut = destinationImage.getCalibration();
+    calOut.setUnit(calIn.getUnit());
+    calOut.pixelDepth = calIn.pixelDepth;
+    calOut.pixelHeight = calIn.pixelHeight;
+    calOut.pixelWidth = calIn.pixelWidth;
+  }
+  /**
+   * Sets the input image calibration to pixels
+   * @param image input image
+   */
+  public static void setCalibrationToPixels(ImagePlus image) {
+    Calibration calib = image.getCalibration();
+    calib.setXUnit("pixels");
+    calib.setYUnit("pixels");
+    calib.setZUnit("pixels");
+    calib.pixelWidth = 1.0D;
+    calib.pixelHeight = 1.0D;
+    calib.pixelDepth = 1.0D;
+    image.setCalibration(calib);
+  }
+ /**
+ * Creates a copy of the specified ImagePlus with the given title and dimensions.
+ * The copy is created with the same width, height, number of slices, and bit depth as the original ImagePlus.
+ * Each slice in the original ImagePlus is duplicated to the copy.
+ *
+ * @param ip The original ImagePlus to be copied.
+ * @param title The title for the copied ImagePlus.
+ * @return A new ImagePlus instance that is a copy of the original ImagePlus.
+ */
   public static ImagePlus copyCarbon(ImagePlus ip, String title) {
     ImagePlus out = NewImage.createImage(title, ip.getWidth(), ip.getHeight(), ip.getNSlices(), ip.getBitDepth(), 1);
     for (int i = 1; i <= ip.getNSlices(); i++) {
@@ -88,7 +142,16 @@ public class imageTricks {
     } 
     return out;
   }
-  
+ /**
+ * Creates a copy of the specified ImagePlus array with the given title and dimensions.
+ * Each ImagePlus of the array is copied. These copy are created with the same 
+ * width, height, number of slices, and bit depth as the original ImagePlus.
+ * Each slice in each original ImagePlus is duplicated to the copy.
+ *
+ * @param ip The original ImagePlus array to be copied.
+ * @param title The title for the copied ImagePlus.
+ * @return A new ImagePlus Array that is a copy of the original ImagePlus array.
+ */
   public static ImagePlus[] copyCarbon(ImagePlus[] ip, String title) {
     ImagePlus temp = NewImage.createImage(title, ip[0].getWidth(), ip[0].getHeight(), ip[0].getNSlices(), ip[0].getBitDepth(), 1);
     ImagePlus[] out = new ImagePlus[ip.length];
@@ -102,7 +165,17 @@ public class imageTricks {
     } 
     return out;
   }
-  
+ /**
+ * Creates a montage of slices from the specified ImagePlus based on the given dimensions.
+ * The montage can be arranged by channels, slices, or frames, with specified columns, border width, and dimension.
+ * The resulting montage is displayed as a new ImagePlus.
+ *
+ * @param ip The original ImagePlus from which to create the montage.
+ * @param nColumns The number of columns for arranging the montage.
+ * @param borderWidth The width of the border between montage elements.
+ * @param dimension The dimension for arranging the montage (Z/0 for slices,C/1 for channels or T/2 for frames).
+ * @return A new ImagePlus instance representing the created montage.
+ */
   public static ImagePlus makeMontage(ImagePlus ip, int nColumns, int borderWidth, int dimension) {
     int channel, timeFrame, ZPosition;
     ImagePlus stack = null;
@@ -149,7 +222,16 @@ public class imageTricks {
     } 
     return new ImagePlus("Montage", out);
   }
-  
+ /**
+ * Creates a montage of the images from a specified ImagePlus array.
+ * The montage can be arranged with specified columns, border width, and dimension.
+ * The resulting montage is displayed as a new ImagePlus.
+ *
+ * @param ip The original ImagePlus array from which to create the montage.
+ * @param nColumns The number of columns for arranging the montage.
+ * @param borderWidth The width of the border between montage elements.
+ * @return A new ImagePlus instance representing the created montage.
+ */
   public static ImagePlus makeMontage(ImagePlus[] ip, int nColumns, int borderWidth) {
     int w = ip[0].getWidth();
     int h = ip[0].getHeight();
@@ -171,7 +253,16 @@ public class imageTricks {
     } 
     return new ImagePlus("Montage", out);
   }
-  
+  /**
+ * Adds a scale bar and text to the provided ImageProcessor based on the given calibration and parameters.
+ * The scale bar displays the calibrated width in the specified units and positions it accordingly.
+ *
+ * @param ip The ImageProcessor to which the scale bar will be added.
+ * @param cal The Calibration instance containing the scaling and unit information.
+ * @param barPosition The position of the scale bar (0 for bottom right, 1 for top left, or other for bottom left).
+ * @param barWidth The width of the scale bar in the specified units.
+ */
+
   public static void addScaleBar(ImageProcessor ip, Calibration cal, int barPosition, int barWidth) {
     int x, barWidthInPixels = (int)(barWidth / cal.pixelWidth);
     int width = ip.getWidth();
@@ -202,16 +293,13 @@ public class imageTricks {
     ip.setFont(oldFont);
     fontSize = 12;
   }
-  
-  public static void transferCal(ImagePlus ipIn, ImagePlus ipOut) {
-    Calibration calIn = ipIn.getCalibration();
-    Calibration calOut = ipOut.getCalibration();
-    calOut.setUnit(calIn.getUnit());
-    calOut.pixelDepth = calIn.pixelDepth;
-    calOut.pixelHeight = calIn.pixelHeight;
-    calOut.pixelWidth = calIn.pixelWidth;
-  }
-  
+ /**
+ * Draws a text label on the provided ImageProcessor using the specified string.
+ * The label is positioned and styled based on the dimensions of the image.
+ *
+ * @param ip The ImageProcessor on which to draw the label.
+ * @param string The string to be used as the label.
+ */  
   public static void drawLabel(ImageProcessor ip, String string) {
     int width = ip.getWidth();
     int height = ip.getHeight();
@@ -225,7 +313,14 @@ public class imageTricks {
     ip.setFont(oldFont);
     fontSize = 12;
   }
-  
+ /**
+ * Adds a cross-shaped marker centered at the specified coordinates with the given radius.
+ * The cross is drawn on the provided ImageProcessor with white color and appropriate line width.
+ *
+ * @param proc The ImageProcessor on which to draw the cross marker.
+ * @param coord An array containing the coordinates [x, y] for the center of the cross.
+ * @param radius The radius of the cross arms.
+ */
   public static void addCross(ImageProcessor proc, int[] coord, int radius) {
     proc.setColor(Color.white);
     proc.setLineWidth(Math.max(2, Math.max(proc.getWidth(), proc.getHeight()) / 500));
@@ -233,7 +328,15 @@ public class imageTricks {
     proc.drawLine(coord[0], coord[1] - radius, coord[0], coord[1] + radius);
     proc.drawLine(coord[0] - radius, coord[1], coord[0] + radius, coord[1]);
   }
-  
+ /**
+ * Adds a cross-shaped marker centered at the specified coordinates with the given radius, and overlays a Region of Interest (ROI).
+ * The cross and ROI are drawn on the provided ImageProcessor with white color and appropriate line width.
+ *
+ * @param proc The ImageProcessor on which to draw the cross marker and overlay the ROI.
+ * @param coord An array containing the coordinates [x, y] for the center of the cross.
+ * @param radius The radius of the cross arms.
+ * @param roi The Region of Interest (ROI) to be overlayed.
+ */
   public static void addCrossAndRoi(ImageProcessor proc, int[] coord, int radius, Roi roi){
     proc.resetRoi();
     proc.multiply(0.5D);
@@ -243,10 +346,25 @@ public class imageTricks {
     proc.drawLine(coord[0] - radius, coord[1], coord[0] + radius, coord[1]);
     proc.draw(roi);
   }
+ /**
+ * Adds the specified ROI to each ImagePlus in the provided array, applying a given ratio and color.
+ *
+ * @param ips An array of ImagePlus instances to which the ROI will be added.
+ * @param Rois An array of ROIs to be added to the ImagePlus instances.
+ * @param ratios An array of ratios to adjust the ROI dimensions (1 for no adjustment).
+ * @param color The color to be used for displaying the ROI.
+ */
   public static void addRoi (ImagePlus []ips, Roi [] Rois, double [] ratios, Color color){
       for (int n=0; n<ips.length; n++) addRoi (ips[n].getChannelProcessor(), Rois[n], ratios[n], color);
   }
-  
+ /**
+ * Adds the ROI specified by its ID to the given ImagePlus, with the specified color.
+ *
+ * @param image The ImagePlus to which the ROI will be added.
+ * @param roiID The ID in the RoiManager of the ROI to be added (zero-based).
+ * @param color The color to be used for displaying the ROI.
+ * @return A new ImagePlus with the specified ROI added and flattened.
+ */
   public static ImagePlus addRoi (ImagePlus image, int roiID, Color color){
        ImagePlus output = (new Duplicator()).run(image, 1, image.getNChannels(), 1, image.getNSlices(), 1, image.getNFrames());
        RoiManager rm=RoiManager.getRoiManager();
@@ -258,6 +376,15 @@ public class imageTricks {
        output = output.flatten();
        return output;
   }
+  
+ /**
+ * Adds the specified ROI to the provided ImageProcessor with the given color and ratio.
+ *
+ * @param proc The ImageProcessor on which to add the ROI.
+ * @param roi The ROI to be added.
+ * @param ratio The ratio to adjust the ROI dimensions (1 for no adjustment).
+ * @param color The color to be used for displaying the ROI.
+ */
   public static void addRoi(ImageProcessor proc, Roi roi, double ratio, Color color ){
       if (roi==null) return;
       proc.resetRoi();
@@ -269,7 +396,10 @@ public class imageTricks {
   }
 
 
-  
+  /**
+   * Applies a FireLUT to the given ImageProcessor 
+   * @param ip input imageProcessor
+   */
   public static void applyFire(ImageProcessor ip) {
     int[] red = { 
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
@@ -363,7 +493,16 @@ public class imageTricks {
     LUT lut = new LUT(8, 256, r, g, b);
     ip.setColorModel((ColorModel)lut);
   }
-  
+ /**
+ * Crops a 2D region of interest (ROI) from the given ImagePlus, saves it as a TIFF image,
+ * and returns the cropped ImagePlus.
+ *
+ * @param ip               The ImagePlus from which to crop the ROI.
+ * @param coordinates      The coordinates (x, y) around which the ROI will be cropped.
+ * @param path             The file path to save the cropped ROI as a TIFF stack.
+ * @param calibratedHalfBox The half-width of the ROI in calibrated units.
+ * @return The cropped ImagePlus representing the ROI around the specified coordinates.
+ */
   public static ImagePlus cropROI(ImagePlus ip, double[] coordinates, String path, double calibratedHalfBox) {
     Calibration cal = ip.getCalibration();
     double boxInPixels = 2*dataTricks.round(calibratedHalfBox / cal.pixelHeight, 0);
@@ -377,7 +516,17 @@ public class imageTricks {
     rm.close();
     return roiImage;
   }
-  
+  /**
+ * Crops a 3D region of interest (ROI) from the given ImagePlus, scales the cropped
+ * image, saves it as a TIFF image and returns the scaled ImagePlus.
+ *
+ * @param ip      The ImagePlus from which to crop and scale the ROI.
+ * @param coordinates      The coordinates (x, y, z) around which the ROI will be cropped and scaled.
+ * @param path             The file path to save the cropped and scaled ROI as a TIFF stack.
+ * @param box              The size of the ROI in calibrated units, assuming a 3D cube.
+ * @param scale            The scaling factor for the ROI image.
+ * @return The scaled ImagePlus representing the ROI around the specified coordinates.
+ */
   public static ImagePlus cropROIAndScale(ImagePlus ip, double[] coordinates, String path, double box, int scale) {
     Calibration cal = ip.getCalibration();
     double halfWidthInPixels = dataTricks.round(box / 2.0D / cal.pixelWidth, 0);
@@ -435,20 +584,17 @@ public class imageTricks {
     rm.close();
     return reSizedRoiImage;
   }
-  
-  
-  
-  public static void setCalibrationToPixels(ImagePlus image) {
-    Calibration calib = image.getCalibration();
-    calib.setXUnit("pixels");
-    calib.setYUnit("pixels");
-    calib.setZUnit("pixels");
-    calib.pixelWidth = 1.0D;
-    calib.pixelHeight = 1.0D;
-    calib.pixelDepth = 1.0D;
-    image.setCalibration(calib);
-  }
-
+ /**
+ * Stamps the results for multiple beads on the input ImagePlus and returns the annotated ImagePlus.
+ *
+ * @param input            The input ImagePlus on which to stamp the results.
+ * @param firstResult      Index of the first result to display from the beadsFeatures list.
+ * @param beadsCoordinates List of coordinates (x, y) of the identified beads.
+ * @param beadsFeatures    List of features/measurements associated with each bead.
+ * @param mjd              The metroloJDialog instance used for configuration
+ * @param justification    The justification for the text (e.g., JUSTIFICATION_RIGHT, JUSTIFICATION_LEFT).
+ * @return Annotated ImagePlus with stamped results for multiple beads.
+ */
   public static ImagePlus StampResultsMultipleBeadsMode(ImagePlus input, int firstResult, List<Double[]> beadsCoordinates,List<String> beadsFeatures, metroloJDialog mjd, int justification) {
     ImagePlus output;
     Calibration cal = input.getCalibration();
@@ -491,12 +637,15 @@ public class imageTricks {
     if (mjd.debugMode) output.show();
     return (output);
   }
-
-            
-    /**    x= output.getWidth()- textShift;
-        y= textShift;
-        size=18;
-    */
+  
+/**
+ * Stamps the results for a single bead on the input ImagePlus and returns the annotated ImagePlus.
+ *
+ * @param input        The input ImagePlus on which to stamp the results.
+ * @param features     The features/measurements associated with the single bead.
+ * @param justification The justification for the text (e.g., JUSTIFICATION_RIGHT, JUSTIFICATION_LEFT).
+ * @return Annotated ImagePlus with stamped results for a single bead.
+ */
   public static ImagePlus StampResultsSingleBeadMode(ImagePlus input, String features, int justification) {
     Calibration cal = input.getCalibration();
     ImagePlus output;
@@ -526,22 +675,16 @@ public class imageTricks {
     output.setTitle(outputTitle);
     return (output);
   }
-
-    public static int findFirstCOAResult(List<coAlignement> beadsCoas){
-        int output=-1;
-        for (int n=0; n<beadsCoas.size(); n++){
-            if (beadsCoas.get(n).result)return(n);   
-        }
-      return(output);
-    }
-      public static int findFirstPPResult(List<PSFprofiler> beadsPPs){
-        int output=-1;
-        for (int n=0; n<beadsPPs.size(); n++){
-            if (beadsPPs.get(n).result)return(n);   
-        }
-      return(output);
-    }
-      
+/**
+ * Creates a TextRoi with specified features, position, font, and justification.
+ *
+ * @param features     The text to be displayed.
+ * @param x            The x-coordinate for the TextRoi.
+ * @param y            The y-coordinate for the TextRoi.
+ * @param font         The font to be used for the TextRoi.
+ * @param justification The justification for the TextRoi: Use JUSTIFICATION_LEFT or JUSTIFICATION_RIGHT.
+ * @return A TextRoi with the specified features, position, font, and justification.
+ */
     private static TextRoi getTextRoi(String features,double x, double y, Font font, int justification){
         TextRoi output= new TextRoi(features, x, y, font);
         if (justification==JUSTIFICATION_RIGHT) output.setJustification(TextRoi.RIGHT);
@@ -550,7 +693,13 @@ public class imageTricks {
         output.setDrawStringMode(true);
         return output;
     }
-  
+  /**
+ * Pads the input ImagePlus with specified dimensions of padding.
+ *
+ * @param image The input ImagePlus to be padded.
+ * @param pad   An array specifying the padding dimensions in pixels : [horizontal, vertical].
+ * @return A new ImagePlus with the original image padded by the specified dimensions.
+ */
     private static ImagePlus padImage(ImagePlus image, int[] pad){
         ImagePlus output;
         int width = image.getWidth()+(2*pad[0]);
@@ -569,14 +718,26 @@ public class imageTricks {
         output=temp.flatten();
         temp.close();
 	return output;
-      
   }
+    
+    /**
+     * Saves the image as a jpeg file
+     * @param image: ImagePlus to be saved
+     * @param path the path to be used to save the image
+     * @param suffix the suffix to be added("" if no suffix)
+     */
     public static void saveImage(ImagePlus image, String path, String suffix){
         path+=suffix;
         FileSaver fs = new FileSaver(image);
         fs.saveAsJpeg(path);
     }
-    
+ /**
+ * Computes and returns the best maximum intensity projection from the input ImagePlus across its channels.
+ *
+ * @param input     The input ImagePlus from which to generate the maximum intensity projections.
+ * @param debugMode Flag indicating whether to enable debug mode for additional output.
+ * @return The best maximum intensity projection ImagePlus based on the channel with the highest maximum intensity.
+ */
     public static ImagePlus getBestProjection(ImagePlus input, boolean debugMode) {
     Calibration cal = input.getCalibration();
     ImagePlus [] image=ChannelSplitter.split(input);

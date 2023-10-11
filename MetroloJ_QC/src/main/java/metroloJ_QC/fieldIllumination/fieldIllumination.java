@@ -284,14 +284,13 @@ public class fieldIllumination {
                     temp.add(fia);
                 } 
                 channelFia[i] = temp;
-            
                 uniformity[i] = min[i] / max[i] * 100.0D;
                 List<Double> azimuthIntensities = new ArrayList<>();
                 for (int c = 4; c < this.channelFia[i].size(); c++) azimuthIntensities.add(Double.valueOf(((fieldIlluminationArray)channelFia[i].get(c)).intensity));
                 fieldUniformity[i] = 100.0D - 100.0D * dataTricks.getSD(azimuthIntensities) / max[i];
                 if (mjd.thresholdChoice) centeringAccuracy[i] = 100.0D - 200.0D * Math.sqrt(Math.pow(xCentThresholdZone[i] - (w / 2), 2.0D) + Math.pow(yCentThresholdZone[i] - (h / 2), 2.0D)) / Math.sqrt(Math.pow(w, 2.0D) + Math.pow(h, 2.0D));
                 else centeringAccuracy[i] = 100.0D - 200.0D * Math.sqrt(Math.pow((xMax[i] - w / 2), 2.0D) + Math.pow((yMax[i] - h / 2), 2.0D)) / Math.sqrt(Math.pow(w, 2.0D) + Math.pow(h, 2.0D));
-                if (!mjd.shorten) {
+                if (mjd.otherTools) {
                     getCValues(i);
                     getCV(i);
                 } 
