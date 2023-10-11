@@ -31,7 +31,7 @@ import metroloJ_QC.reportGenerators.QC_Generate_Tests;
  */
 public class MetroloJ_QC implements PlugIn, ActionListener, Runnable {
     // the plugin's version
-    public static final String VERSION="1.2.8";
+    public static final String VERSION="1.3.0";
     
     // a boolean used to allow for the display of the debug checkboxes in each individual dialogs
     // change this back to false when releasing a new version
