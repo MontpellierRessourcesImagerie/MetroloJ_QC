@@ -19,8 +19,20 @@ import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+/**
+ * Utility class containing various file handling methods for saving, loading, and manipulating files.
+ * This class provides methods to save content to files, handle Regions of Interest (ROIs),
+ * load tab-delimited data, manipulate file paths, or open PDF files based on the operating system.
+ */
 public class fileTricks {
-  public static void save(String content, String path) {
+ 
+ /**
+ * Saves the provided String into a file at the specified path.
+ *
+ * @param content The String to be saved into the file.
+ * @param path    The path to the file where the content will be saved.
+ */
+    public static void save(String content, String path) {
     try {
       BufferedWriter file = new BufferedWriter(new FileWriter(path));
       file.write(content, 0, content.length());
@@ -29,7 +41,12 @@ public class fileTricks {
       Logger.getLogger(fileTricks.class.getName()).log(Level.SEVERE, (String)null, ex);
     } 
   }
-  
+ /**
+ * Saves a single Region of Interest (ROI) into a specified file.
+ *
+ * @param roi  The Region of Interest (ROI) to be saved.
+ * @param path The path to the file where the ROI will be saved.
+ */
   public static void saveRoi(Roi roi, String path) {
     try {
       RoiEncoder re = new RoiEncoder(path);
@@ -38,7 +55,13 @@ public class fileTricks {
       System.out.println("Can't save roi");
     } 
   }
-  
+ /**
+ * Saves an array of Regions of Interest (ROIs) into a compressed zip file.
+ * Each ROI is saved as a separate entry within the zip file.
+ *
+ * @param rois An array of Regions of Interest (ROIs) to be saved.
+ * @param path The path to the zip file where the ROIs will be saved.
+ */
   public static void saveRois(Roi[] rois, String path) {
     try {
       ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(path));
@@ -60,7 +83,12 @@ public class fileTricks {
       System.out.println("Can't save rois");
     } 
   }
-  
+  /**
+ * Loads data from a tab-delimited file into a list of String arrays.
+ *
+ * @param path The path to the tab-delimited file to be loaded.
+ * @return A list of String arrays, where each array represents a line from the file split by tabs.
+ */
   public static List<String[]> load(String path) {
     List<String[]> out = (List)new ArrayList<>();
     try {
@@ -76,7 +104,11 @@ public class fileTricks {
     } 
     return out;
   }
-  
+ /** removes the folder information from a path and leaves the file name
+  * e.g. d:\Users\Julien Cau\Coalignement\100x_LSM980.czi > 100x_LSM980.czi
+  * @param path : the file's path
+  * @return the filename
+  */
   public static String cropName(String path) {
     String name = path;
     if (path.contains(File.separator)) {
@@ -89,22 +121,31 @@ public class fileTricks {
     } 
     return name;
   }
-  
-  public static String cropExtension(String path) {
-    String output = path;
-    if (path.contains(".")) {
-        int nb = path.lastIndexOf(".");
-        if (path.length()<75){
-            output = path.substring(0, nb);
+ /**
+ * Removes the file extension from a given file name.
+ * e.g. 100x_LSM980.czi > 100x_LSM980
+ * @param fileName The file name from which to remove the extension.
+ * @return The file name without the file extension, or the original file name if no extension is found.
+ */ 
+  public static String cropExtension(String fileName) {
+    String output = fileName;
+    if (fileName.contains(".")) {
+        int nb = fileName.lastIndexOf(".");
+        if (fileName.length()<75){
+            output = fileName.substring(0, nb);
         }
         else {
             output="";
-            for (int n=0; n<nb; n++) output+=path.charAt(n);
+            for (int n=0; n<nb; n++) output+=fileName.charAt(n);
         }
     } 
     return output;
   }
-  
+ /**
+ * Opens the specified PDF file using the default PDF viewer based on the operating system.
+ * Supports opening PDF files on Windows, macOS, and Linux.
+ * @param path The path to the PDF file to be opened.
+ */
   public static void showPdf(String path) {
     if (IJ.isWindows())
       try {
