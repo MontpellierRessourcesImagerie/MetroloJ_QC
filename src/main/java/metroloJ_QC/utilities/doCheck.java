@@ -236,7 +236,7 @@ public static String getIsVersionUpToDate() {
  * @return true if the current image's depth is 16 bits or less, false if it is more than 16 bits.
  */ 
   public static boolean isNoMoreThan16bits(boolean showMessage) {
-    if (WindowManager.getCurrentImage().getBitDepth() <= 16)
+    if (getBitDepth(WindowManager.getCurrentImage()) <= 16)
       return true; 
     if (showMessage)
       IJ.error("The input file format's depth should be either 8 or 16-bits."); 
@@ -256,7 +256,7 @@ public static String getIsVersionUpToDate() {
  */
   public static String getIsNoMoreThan16bits() {
     String output="";
-    if (WindowManager.getCurrentImage().getBitDepth() > 16) output="The input file format's depth should be either 8 or 16-bits."; 
+    if (getBitDepth(WindowManager.getCurrentImage()) > 16) output="The input file format's depth should be either 8 or 16-bits."; 
     return (output);
   }
 
@@ -343,8 +343,7 @@ public static String getIsVersionUpToDate() {
   }
     
   public static boolean bitDepthIsConsistent(int imageBitDepth, boolean showMessage) {
-    
-    int fileFormatBitDepth=WindowManager.getCurrentImage().getBitDepth();
+    int fileFormatBitDepth=getBitDepth(WindowManager.getCurrentImage());
     switch (fileFormatBitDepth){
         case 8:
             if (imageBitDepth==8)return true;
@@ -360,9 +359,29 @@ public static String getIsVersionUpToDate() {
       IJ.error("The file format's depth ("+fileFormatBitDepth+" is incompatible with the expected image's depth ("+imageBitDepth+")"); 
     return false;
   }
-    
+  
+  
+  public static int getBitDepth(ImagePlus image){
+    int fileFormatBitDepth=image.getBitDepth();
+    if (fileFormatBitDepth==0){
+        int imageType=image.getType();
+        switch (imageType){
+            case ImagePlus.GRAY8 : 
+                fileFormatBitDepth=8;
+            break;
+            case ImagePlus.GRAY16 : 
+                fileFormatBitDepth=16;
+            break;   
+            case ImagePlus.GRAY32:
+                fileFormatBitDepth=32;
+            break;
+        }   
+    }
+    return (fileFormatBitDepth);    
+  }
+  
   public static String getIsExpectedBitDepth(int imageBitDepth) {
-    int fileFormatBitDepth=WindowManager.getCurrentImage().getBitDepth();
+    int fileFormatBitDepth=getBitDepth(WindowManager.getCurrentImage());
     switch (fileFormatBitDepth){
         case 8:
             if (imageBitDepth==8)return ("");
@@ -821,7 +840,7 @@ public static String getSamplingDensityString(microscope micro, MetroloJDialog m
         montage.getProcessor().setAutoThreshold(mjd.beadDetectionThreshold, true, 0);
     }
     else {
-        if (image.getBitDepth()!= 8 && image.getBitDepth() != 16){
+        if (getBitDepth(image)!= 8 && getBitDepth(image) != 16){
             (new ImageConverter(image)).convertToGray16();
             image.updateImage();
         }

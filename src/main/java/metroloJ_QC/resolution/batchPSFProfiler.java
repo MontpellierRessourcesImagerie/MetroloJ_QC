@@ -25,9 +25,7 @@ public static final int X = 0;
 public static final int Y = 1;
 public static final int Z = 2;
 public static final String[] dimensions=new String[] {"X","Y","Z"};
-// final variable used for outlier's fences
-public static final int LOWER_FENCE=0;
-public static final int UPPER_FENCE=1;
+
 
   // final variable used in the arrays containing the aggregated metrics
   public final int MEAN=0;
@@ -94,7 +92,16 @@ public static final int UPPER_FENCE=1;
         saturationProportion=new String[mjd.emWavelengths.length];
         samplingProportion=new String[mjd.emWavelengths.length][3];
         this.rawResValues = new ArrayList[mjd.emWavelengths.length][3];
-        if (mjd.outliers) fences=new Double[mjd.emWavelengths.length][3][2];
+        if (mjd.outliers) {
+            switch(mjd.outlierMode){
+                case MetroloJDialog.USING_IQR:
+                    fences=new Double[mjd.emWavelengths.length][3][2];
+                break;
+                case MetroloJDialog.USING_MEDIAN:
+                    fences=new Double[mjd.emWavelengths.length][3][3];
+                break;
+            }
+        }
         this.resValues = new ArrayList[mjd.emWavelengths.length][3];
         this.compiledValues = new averageBeadsResolutionValues [mjd.emWavelengths.length][3];
         aggregatePPs(pps);
@@ -206,15 +213,14 @@ public static final int UPPER_FENCE=1;
     for (int k = 0; k < rawResValues[channel][dimension].size(); k++) {
         if (!rawResValues[channel][dimension].get(k).isFiltered) resolutionValues.add(rawResValues[channel][dimension].get(k).res);
     }
-    Double[] tempFencesValues=dataTricks.getOutliersFences(resolutionValues);
+    Double[] tempFencesValues=dataTricks.getOutliersFences(resolutionValues, mjd.outlierMode);
     fences[channel][dimension]=tempFencesValues;
-    if (tempFencesValues[LOWER_FENCE]==Double.NaN || tempFencesValues[UPPER_FENCE]==Double.NaN) return;
     for (int k = 0; k < rawResValues[channel][dimension].size(); k++) {
         if (!rawResValues[channel][dimension].get(k).isFiltered){
-            if (rawResValues[channel][dimension].get(k).res<tempFencesValues[LOWER_FENCE]||rawResValues[channel][dimension].get(k).res>tempFencesValues[UPPER_FENCE]) {
+            if ((!tempFencesValues[dataTricks.LOWER_FENCE].isNaN()&&rawResValues[channel][dimension].get(k).res<tempFencesValues[dataTricks.LOWER_FENCE])||(!tempFencesValues[dataTricks.UPPER_FENCE].isNaN()&&rawResValues[channel][dimension].get(k).res>tempFencesValues[dataTricks.UPPER_FENCE])) {
                 rawResValues[channel][dimension].get(k).isOutlier=true;
-                if (rawResValues[channel][dimension].get(k).res<tempFencesValues[LOWER_FENCE])rawResValues[channel][dimension].get(k).status="outlier (below lower fence of "+dataTricks.round(tempFencesValues[LOWER_FENCE],3)+""+IJ.micronSymbol+"m)";
-                if (rawResValues[channel][dimension].get(k).res>tempFencesValues[UPPER_FENCE])rawResValues[channel][dimension].get(k).status="outlier (above upper fence of "+dataTricks.round(tempFencesValues[UPPER_FENCE],3)+""+IJ.micronSymbol+"m)";
+                if (rawResValues[channel][dimension].get(k).res<tempFencesValues[dataTricks.LOWER_FENCE])rawResValues[channel][dimension].get(k).status="outlier (below lower fence of "+dataTricks.round(tempFencesValues[dataTricks.LOWER_FENCE],3)+""+IJ.micronSymbol+"m)";
+                if (rawResValues[channel][dimension].get(k).res>tempFencesValues[dataTricks.UPPER_FENCE])rawResValues[channel][dimension].get(k).status="outlier (above upper fence of "+dataTricks.round(tempFencesValues[dataTricks.UPPER_FENCE],3)+""+IJ.micronSymbol+"m)";
             }
             else rawResValues[channel][dimension].get(k).status="valid";
         }
@@ -359,18 +365,36 @@ public static final int UPPER_FENCE=1;
    */
   public content [][] getFencesSummary() {
     int rows = this.genericMicro.emWavelengths.length + 1;
-    int cols = 1+ 2*3;
+    int factor=2;
+    if (mjd.outlierMode==MetroloJDialog.USING_MEDIAN) factor++;
+    int cols = 1+ factor*3;
     content [][] output = new content [rows][cols];
     output[0][0] = new content("",content.TEXT);
     for(int dim=0; dim<3; dim++){
-        output[0][2*dim+1]=new content(dimensions[dim]+"res Lower Fence ("+IJ.micronSymbol+"m)",content.TEXT);
-        output[0][2*dim+2]=new content(dimensions[dim]+"res Upper Fence ("+IJ.micronSymbol+"m)",content.TEXT);
+        int refCol=0;
+        if (mjd.outlierMode==MetroloJDialog.USING_MEDIAN) {
+            output[0][factor*dim+1]=new content(dimensions[dim]+"res spread significativity",content.TEXT);
+            refCol++;
+        }
+        output[0][factor*dim+refCol+1]=new content(dimensions[dim]+"res Lower Fence ("+IJ.micronSymbol+"m)",content.TEXT);
+        output[0][factor*dim+refCol+2]=new content(dimensions[dim]+"res Upper Fence ("+IJ.micronSymbol+"m)",content.TEXT);
+        
     }    
     for (int i = 0; i < this.genericMicro.emWavelengths.length; i++) {
         output[i+1][0] = new content("Channel"+i, content.TEXT);
         for(int dim=0; dim<3; dim++){    
-            output[i+1][2*dim+1]=new content(""+dataTricks.round(fences[i][dim][LOWER_FENCE],3),content.TEXT);
-            output[i+1][2*dim+2]=new content(""+dataTricks.round(fences[i][dim][UPPER_FENCE],3),content.TEXT);
+            int refCol=0;
+            if (mjd.outlierMode==MetroloJDialog.USING_MEDIAN) {
+                if (fences[i][dim][dataTricks.SIGNIFICATIVITY]<1.0D) {
+                    output[i+1][factor*dim+1]=new content("no significant differences (significativity of "+dataTricks.round(fences[i][dim][dataTricks.SIGNIFICATIVITY],3)+")",content.TEXT);
+                }
+                else output[i+1][factor*dim+1]=new content(""+dataTricks.round(fences[i][dim][dataTricks.SIGNIFICATIVITY],3),content.TEXT);
+                refCol++;
+            }    
+            if (fences[i][dim][dataTricks.LOWER_FENCE].isNaN())output[i+1][factor*dim+1+refCol]=new content("NaN",content.TEXT);
+            else output[i+1][factor*dim+1+refCol]=new content(""+dataTricks.round(fences[i][dim][dataTricks.LOWER_FENCE],3),content.TEXT);
+            if (fences[i][dim][dataTricks.UPPER_FENCE].isNaN())output[i+1][factor*dim+2+refCol]=new content("NaN",content.TEXT);
+            else output[i+1][factor*dim+2+refCol]=new content(""+dataTricks.round(fences[i][dim][dataTricks.UPPER_FENCE],3),content.TEXT);
         }
     }    
     if (mjd.debugMode) content.contentTableChecker(output, "getFencesSummary() output in batchPSFProfiler)");

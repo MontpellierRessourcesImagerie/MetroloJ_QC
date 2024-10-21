@@ -25,6 +25,8 @@ public class QC_Options {
     public final String PREF_KEY="General_selectedThresholdMethods.String";
     public boolean useVirtualStacks=Prefs.get("General_useVirtualStacks.boolean", true);
     public boolean allow32BitsImages=Prefs.get("General_allow32BitsImages.boolean", true);
+    public static double iqrFactor=1.5D;
+    public static double outlierQuantile=0.9D;
     // a boolean used to allow scrollable dialogs
     public boolean useScrollBars=Prefs.get("General_useScrollBars.boolean", true);
     
