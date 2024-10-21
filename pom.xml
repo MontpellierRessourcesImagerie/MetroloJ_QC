@@ -161,6 +161,16 @@
             <version>6.1.1</version>
             <type>jar</type>
         </dependency>
+        <dependency>
+            <groupId>fr.igred</groupId>
+            <artifactId>simple-omero-client</artifactId>
+            <version>5.19.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openmicroscopy</groupId>
+            <artifactId>omero-gateway</artifactId>
+            <version>5.9.3</version>
+        </dependency>
     </dependencies>
 
     <build>

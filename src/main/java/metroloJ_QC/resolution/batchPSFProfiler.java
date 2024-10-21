@@ -206,7 +206,7 @@ public static final int UPPER_FENCE=1;
     for (int k = 0; k < rawResValues[channel][dimension].size(); k++) {
         if (!rawResValues[channel][dimension].get(k).isFiltered) resolutionValues.add(rawResValues[channel][dimension].get(k).res);
     }
-    Double[] tempFencesValues=dataTricks.getOutliersFences(resolutionValues);
+    Double[] tempFencesValues=dataTricks.getOutliersFences(resolutionValues, mjd.options.outlierMode);
     fences[channel][dimension]=tempFencesValues;
     if (tempFencesValues[LOWER_FENCE]==Double.NaN || tempFencesValues[UPPER_FENCE]==Double.NaN) return;
     for (int k = 0; k < rawResValues[channel][dimension].size(); k++) {

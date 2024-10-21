@@ -214,7 +214,7 @@ public void filterBeads(int combination){
     for (int k = 0; k < rawCoaValues[combination].size(); k++) {
         if (!rawCoaValues[combination].get(k).isFiltered) ratioValues.add(rawCoaValues[combination].get(k).ratio);
     }
-    fences[combination]=dataTricks.getOutliersFences(ratioValues);
+    fences[combination]=dataTricks.getOutliersFences(ratioValues, mjd.options.outlierMode);
     if (fences[combination][LOWER_FENCE]==Double.NaN || fences[combination][UPPER_FENCE]==Double.NaN) return;
     for (int k = 0; k < rawCoaValues[combination].size(); k++) {
         if (!rawCoaValues[combination].get(k).isFiltered){

@@ -4,6 +4,7 @@ import ij.measure.Calibration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import metroloJ_QC.setup.QC_Options;
 /**
  * This class contains static methods used to deal with numbers or lists
  */
@@ -266,45 +267,7 @@ public class dataTricks {
     for (; input[out] == 0 && out >= 0; out--);
     return out;
   }
-  /**
-   * removes the outliers from a list of Doubles. The list is sorted and split into
-   * 2. The median of each sublist are used to define lower/upper fences below/above
-   * which values are considered as outliers
-   * @param input double list
-   * @return the list purged of outlier values
-   */
-  public static List<Double> removeOutliers(List<Double> input) {
-    List<Double> output = new ArrayList<>();
-    if (input.size() > 4) {
-      Collections.sort(input);
-      List<Double> data1 = new ArrayList<>();
-      List<Double> data2 = new ArrayList<>();
-      if (input.size() % 2 == 0) {
-        data1 = input.subList(0, input.size() / 2);
-        data2 = input.subList(input.size() / 2, input.size());
-      } else {
-        data1 = input.subList(0, input.size() / 2);
-        data2 = input.subList(input.size() / 2 + 1, input.size());
-      } 
-      double q1 = getMedian(data1);
-      double q3 = getMedian(data2);
-      double iqr = q3 - q1;
-      if (iqr != 0.0D) {
-        double lowerFence = q1 - 1.5D * iqr;
-        double upperFence = q3 + 1.5D * iqr;
-        for (int i = 0; i < input.size(); i++) {
-          if ((input.get(i)) > lowerFence && (input.get(i)) < upperFence)
-            output.add(input.get(i)); 
-        } 
-      } else {
-        output = input;
-      } 
-    } else {
-      output = input;
-    } 
-    return output;
-  }
-  
+
   
   /**
    * Creates a list of outliers status from an input list of Doubles. The input list is sorted and split into
@@ -313,80 +276,68 @@ public class dataTricks {
    * @param input input double list
    * @return a list of the same size as the input list, of boolean (false: not an outlier, true : outlier)
    */
-  public static Double[] getOutliersFences(List<Double> input) {
+  public static Double[] getOutliersFences(List<Double> input, int outlierMode) {
     if (input.size()<5||input==null) return (new Double[]{Double.NaN, Double.NaN});
     else {
-        Collections.sort(input);
-        List<Double> data1 = new ArrayList<>();
-        List<Double> data2 = new ArrayList<>();
-        if (input.size() % 2 == 0) {
-            data1 = input.subList(0, input.size() / 2);
-            data2 = input.subList(input.size() / 2, input.size());
-        } 
-        else {
-            data1 = input.subList(0, input.size() / 2);
-            data2 = input.subList(input.size() / 2 + 1, input.size());
-        } 
-        double q1 = getMedian(data1);
-        double q3 = getMedian(data2);
-        double iqr = q3 - q1;
-        if (iqr != 0.0D) {
-            double lowerFence = q1 - 1.5D * iqr;
-            double upperFence = q3 + 1.5D * iqr;
-            return(new Double[]{lowerFence, upperFence});
-       } 
-      else return (new Double[]{Double.NaN, Double.NaN});
+        switch (outlierMode){
+            case QC_Options.USING_IQR : 
+                Collections.sort(input);
+                List<Double> data1 = new ArrayList<>();
+                List<Double> data2 = new ArrayList<>();
+                if (input.size() % 2 == 0) {
+                    data1 = input.subList(0, input.size() / 2);
+                    data2 = input.subList(input.size() / 2, input.size());
+                } 
+                else {
+                    data1 = input.subList(0, input.size() / 2);
+                    data2 = input.subList(input.size() / 2 + 1, input.size());
+                } 
+                Double q1 = getMedian(data1);
+                Double q3 = getMedian(data2);
+                Double iqr = q3 - q1;
+                if (iqr != 0.0D&&!iqr.isNaN()&&!q1.isNaN()&&!q3.isNaN()) {
+                    double lowerFence = q1 - QC_Options.iqrFactor * iqr;
+                    double upperFence = q3 + QC_Options.iqrFactor * iqr;
+                    return(new Double[]{lowerFence, upperFence});
+                } 
+                else return (new Double[]{Double.NaN, Double.NaN});
+            case QC_Options.USING_MEDIAN :
+                Double median=getMedian(input);
+                if (!median.isNaN()){
+                    List<Double> drift = new ArrayList<>();
+                    for (Double value : input) {
+                        if (value != null && !Double.isNaN(value)) {
+                            drift.add(Math.abs(value-median));
+                        }
+                    }
+                    Double quantile=getQuantile(drift, QC_Options.outlierQuantile);
+                    Collections.sort(drift);
+                    data1 = new ArrayList<>();
+                    data2 = new ArrayList<>();
+                    if (drift.size() % 2 == 0) {
+                        data1 = drift.subList(0, drift.size() / 2);
+                        data2 = drift.subList(drift.size() / 2, drift.size());
+                    } 
+                    else {
+                        data1 = drift.subList(0, drift.size() / 2);
+                        data2 = drift.subList(drift.size() / 2 + 1, drift.size());
+                    } 
+                    iqr = getMedian(data2) - getMedian(data1);
+                    if (!iqr.isNaN()&&quantile.isNaN()){
+                        if (((quantile-median)/iqr)<1) return (new Double[]{Double.NaN, Double.NaN});
+                        else {
+                            double lowerFence = median-quantile;
+                            double upperFence = median+quantile;
+                        }
+                    }
+                }
+                break;
+        }  
     }
-  }
-  /**
-   * returns a list of outliers indices from a Double list. The list is sorted and split into
-   * 2. The median of each sublist are used to define lower/upper fences below/above
-   * which values are considered as outliers. Their indices within the original list 
-   * are then retrieved
-   * @param input Double list
-   * @return a list of indices of outliers values within the original input list
-   */
-  public static List<Integer> getOutliersIIndices(List<Double> input) {
-    List<Integer> output = new ArrayList<>();
-    if (input.size() > 4) {
-      Collections.sort(input);
-      List<Double> data1 = new ArrayList<>();
-      List<Double> data2 = new ArrayList<>();
-      if (input.size() % 2 == 0) {
-        data1 = input.subList(0, input.size() / 2);
-        data2 = input.subList(input.size() / 2, input.size());
-      } else {
-        data1 = input.subList(0, input.size() / 2);
-        data2 = input.subList(input.size() / 2 + 1, input.size());
-      } 
-      double q1 = getMedian(data1);
-      double q3 = getMedian(data2);
-      double iqr = q3 - q1;
-      if (iqr != 0.0D) {
-        double lowerFence = q1 - 1.5D * iqr;
-        double upperFence = q3 + 1.5D * iqr;
-        for (int i = 0; i < input.size(); i++) {
-          if (((Double)input.get(i)).doubleValue() < lowerFence && ((Double)input.get(i)).doubleValue() > upperFence)
-            output.add(i); 
-        } 
-      } 
-    } 
-    return output;
-  }
-  /**
-   * removes the outliers from a list of Doubles based on a list of outliers indices. 
-   * @param input original list
-   * @param outliersIndices list of indices of the outliers within the original list 
-   * @return the purged list
-   */
-  public static List<Double> removeOutliersIfromOutliersIndicesList(List<Double> input, List<Integer> outliersIndices) {
-    List<Double> output = new ArrayList<>();
-    for (int i=0; i<input.size(); i++)output.add(input.get(i));
-    for(int i=outliersIndices.size()-1; i>-1; i--){
-        output.remove((int)outliersIndices.get(i));
-    }
-    return output;
-  }
+    return (new Double[]{Double.NaN, Double.NaN});
+  }   
+  
+ 
   /**
  * Retrieves a list of Double arrays, each containing a specified number of elements from the original list of double arrays.
  * If the input list is empty, an empty list is returned.
@@ -412,14 +363,41 @@ public class dataTricks {
  * @param data input list of Doubles
  * @return the median Double value
  */
-  public static Double getMedian(List<Double> data) {
-    if (data.isEmpty())
-      return Double.NaN; 
-    Collections.sort(data);
-    if (data.size() / 2 == 0)
-      return (((Double)data.get(data.size() / 2)).doubleValue() + ((Double)data.get(data.size() / 2 - 1)).doubleValue()) / 2.0D; 
-    return ((Double)data.get(data.size() / 2)).doubleValue();
-  }
+ public static Double getMedian(List<Double> data) {
+    if (data.isEmpty()) return Double.NaN;
+    List<Double> validValues = new ArrayList<>();
+    for (Double value : data) {
+        if (value != null && !Double.isNaN(value)) {
+            validValues.add(value);
+        }
+    }
+    if (validValues.isEmpty()) return Double.NaN; // Ajouté pour gérer le cas où tous les éléments sont NaN
+    Collections.sort(validValues);
+    int size = validValues.size();
+    int middle = size / 2;
+    if (size % 2 == 0)
+        return (validValues.get(middle - 1) + validValues.get(middle)) / 2.0;
+    else
+        return validValues.get(middle);
+}
+  
+ 
+private static double getQuantile(List<Double> values, double quantile) {
+    if (values.isEmpty()) return Double.NaN;
+    List<Double> validValues = new ArrayList<>();
+    for (Double value : values) {
+        if (value != null && !Double.isNaN(value)) {
+            validValues.add(value);
+        }
+    }
+    if (validValues.isEmpty()) return Double.NaN;
+    Collections.sort(validValues);
+    int index = (int) Math.ceil(quantile * validValues.size()) - 1;
+    return validValues.get(index);
+}
+
+
+
  /**
  * Calculates the mean (average) of a list of Double values.
  * If the input list is empty, returns Double.NaN.
