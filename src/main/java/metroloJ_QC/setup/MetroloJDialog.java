@@ -74,6 +74,9 @@ public class MetroloJDialog extends GenericDialog{
   
   // available methods provided to identify centers
   public  String[] CENTER_DETECTION_METHODS = new String[] {"Legacy Fit ellipses", "Centroid"};
+  public String [] OUTLIER_METHODS=new String[]{"using IQR", "using Median"};
+  public static final int USING_IQR=0;
+  public static final int USING_MEDIAN=1;
   public final int FIT_ELLIPSES= 0;
   public final int CENTROID = 1;
   public final int MAX_INTENSITY=2;
@@ -284,7 +287,8 @@ public class MetroloJDialog extends GenericDialog{
 
   // in batch mode, boolean used to remove outliers from a series of n values (applies if n>5)
   public boolean outliers = Prefs.get("MetroloJDialog_outliers.boolean", false);
-  
+  // in batch mode, how outliers are calculated
+  public int outlierMode=(int)Prefs.get("MetroloJDialog_outlierMode.double", 0.0D);
   // boolean used to shorten the analyses (true : short versions of the report, false : long versions)
   public boolean shorten = Prefs.get("MetroloJDialog_shorten.boolean", true);
   
@@ -887,8 +891,10 @@ private void addValidationParameters(GenericDialog gd, int leftInset) {
         case "bpp":
             gd.setInsets(5, leftInset, 0);
             gd.addNumericField("Reject PSF profile with R2 below ", R2Threshold, 2);
-            gd.addToSameRow();
+            gd.setInsets(5, leftInset, 0);
             gd.addCheckbox("Remove outliers?", this.outliers);
+            gd.addToSameRow();
+            gd.addChoice("Outlier calculation method", this.OUTLIER_METHODS, this.OUTLIER_METHODS[this.outlierMode]);
             gd.setInsets(5, leftInset, 0);
             gd.addNumericField("Reject XY ratio above ", XYratioTolerance, 1);
             gd.addToSameRow();
@@ -901,6 +907,8 @@ private void addValidationParameters(GenericDialog gd, int leftInset) {
         case "bcoa":
             gd.setInsets(5, leftInset, 0);
             gd.addCheckbox("Remove outliers?", this.outliers);
+            gd.addToSameRow();
+            gd.addChoice("Outlier calculation method", this.OUTLIER_METHODS, this.OUTLIER_METHODS[this.outlierMode]);
             gd.setInsets(5, leftInset, 0);
             gd.addNumericField("Reject coregistration ratio above ", coalRatioTolerance, 1);
         break;    
@@ -1220,7 +1228,7 @@ public void showErrorDialog(int errorType){
             errorDialog.addStringField("Please modify the title of report", title);
             break;
         case BITDEPTH:
-            errorDialog.addMessage("An inconsistency was detected between the file format's depth ("+ip.getBitDepth()+")");
+            errorDialog.addMessage("An inconsistency was detected between the file format's depth ("+doCheck.getBitDepth(ip)+")");
             errorDialog.addMessage("of the opened image and the entered image bit depth value ("+bitDepth+")");
             errorDialog.setInsets(5, LEFT_INSET, 0);
             errorDialog.addNumericField("Please modify the actual image bit depth", bitDepth);
@@ -1867,6 +1875,7 @@ private void getValidationParameters(GenericDialog gd){
         case "bpp":
             this.R2Threshold=gd.getNextNumber();
             this.outliers = gd.getNextBoolean();
+            outlierMode=gd.getNextChoiceIndex();
             this.XYratioTolerance = gd.getNextNumber();
             this. ZratioTolerance = gd.getNextNumber();
         break;
@@ -1875,6 +1884,7 @@ private void getValidationParameters(GenericDialog gd){
         break; 
         case "bcoa":
             this.outliers = gd.getNextBoolean();
+            outlierMode=gd.getNextChoiceIndex();
             this.coalRatioTolerance = gd.getNextNumber();
         break;
     }
@@ -1955,7 +1965,7 @@ public void getInfo(GenericDialog gd){
     noiseChoice = this.getNextBoolean();
     temperatureChoice = this.getNextBoolean();
     getDebugMode(this);
-    while(!doCheck.bitDepthIsConsistent(bitDepth))showErrorDialog(BITDEPTH);
+    while(!doCheck.bitDepthIsConsistent(bitDepth)&&!errorDialogCanceled)showErrorDialog(BITDEPTH);
   }
    /**
    * Gets all parameters and options used in coAlignement analyses
@@ -1969,7 +1979,7 @@ public void getInfo(GenericDialog gd){
     this.multipleBeads = this.getNextBoolean();
     getValidationParameters(this);
     getDebugMode(this);
-    while(!doCheck.bitDepthIsConsistent(bitDepth))showErrorDialog(BITDEPTH);
+    while(!doCheck.bitDepthIsConsistent(bitDepth)&&!errorDialogCanceled)showErrorDialog(BITDEPTH);
   }
    /**
    * Gets all parameters and options used in fieldIllumination analyses
@@ -1986,7 +1996,7 @@ public void getInfo(GenericDialog gd){
     thresholdChoice = this.getNextBoolean();
     getValidationParameters(this);
     getDebugMode(this);
-    while(!doCheck.bitDepthIsConsistent(bitDepth))showErrorDialog(BITDEPTH);
+    while(!doCheck.bitDepthIsConsistent(bitDepth)&&!errorDialogCanceled)showErrorDialog(BITDEPTH);
   }
    /**
    * Gets all parameters and options used in PSFProfiler analyses
@@ -2002,7 +2012,7 @@ public void getInfo(GenericDialog gd){
     if (sqrtChoice) this.overlayColor=Color.BLACK;
     getValidationParameters(this);
     getDebugMode(this);
-    while(!doCheck.bitDepthIsConsistent(bitDepth))showErrorDialog(BITDEPTH);
+    while(!doCheck.bitDepthIsConsistent(bitDepth)&&!errorDialogCanceled)showErrorDialog(BITDEPTH);
   }
   /**
    * Gets all parameters and options used in batchCoAlignement analyses
@@ -2016,7 +2026,7 @@ public void getInfo(GenericDialog gd){
     this.multipleBeads = this.getNextBoolean();
     getValidationParameters(this);
     getDebugMode(this);
-    while(!doCheck.bitDepthIsConsistent(bitDepth))showErrorDialog(BITDEPTH);
+    while(!doCheck.bitDepthIsConsistent(bitDepth)&&!errorDialogCanceled)showErrorDialog(BITDEPTH);
   }
  /**
    * Gets all parameters and options used in batchFieldIllumination analyses
@@ -2034,7 +2044,7 @@ public void getInfo(GenericDialog gd){
     thresholdChoice = this.getNextBoolean();
     getValidationParameters(this);
     getDebugMode(this);
-    while(!doCheck.bitDepthIsConsistent(bitDepth))showErrorDialog(BITDEPTH);
+    while(!doCheck.bitDepthIsConsistent(bitDepth)&&!errorDialogCanceled)showErrorDialog(BITDEPTH);
 
   }
  /**
@@ -2050,7 +2060,7 @@ public void getInfo(GenericDialog gd){
     sqrtChoice = this.getNextBoolean();
     getValidationParameters(this);
     getDebugMode(this);
-    while(!doCheck.bitDepthIsConsistent(bitDepth))showErrorDialog(BITDEPTH);
+    while(!doCheck.bitDepthIsConsistent(bitDepth)&&!errorDialogCanceled)showErrorDialog(BITDEPTH);
   }
   /**
    * Gets all parameters and options used in ZProfiler analyses
@@ -2068,7 +2078,7 @@ public void getInfo(GenericDialog gd){
     getDebugMode(this);
     roi=ip.getRoi();
     ip.setRoi(roi);
-    while(!doCheck.bitDepthIsConsistent(bitDepth))showErrorDialog(BITDEPTH);
+    while(!doCheck.bitDepthIsConsistent(bitDepth)&&!errorDialogCanceled)showErrorDialog(BITDEPTH);
   }
  /**
    * Gets all parameters and options used in DriftProfiler analyses
@@ -2090,7 +2100,7 @@ public void getInfo(GenericDialog gd){
     R2Threshold=this.getNextNumber();
     showProjections=this.getNextBoolean();
     getDebugMode(this);
-    while(!doCheck.bitDepthIsConsistent(bitDepth))showErrorDialog(BITDEPTH);
+    while(!doCheck.bitDepthIsConsistent(bitDepth)&&!errorDialogCanceled)showErrorDialog(BITDEPTH);
   }  
  
    
@@ -2257,6 +2267,8 @@ public void saveBeadDetectionPrefs(){
         case "bcoa":
             Prefs.set("CoAlignementReport_coalRatioTolerance.double", coalRatioTolerance); 
             Prefs.set("MetroloJDialog_outliers.boolean", this.outliers);
+            Prefs.set("MetroloJDialog_outlierMode.double", this.outlierMode);
+            
         break;    
         case "pp":
             Prefs.set("PSFProfilerReport_XYratioTolerance.double", XYratioTolerance);
@@ -2266,6 +2278,7 @@ public void saveBeadDetectionPrefs(){
             Prefs.set("PSFProfilerReport_XYratioTolerance.double", XYratioTolerance);
             Prefs.set("PSFProfilerReport_ZratioTolerance.double", ZratioTolerance);
             Prefs.set("MetroloJDialog_outliers.boolean", this.outliers);
+            Prefs.set("MetroloJDialog_outlierMode.double", this.outlierMode);
         break;               
     }
   }
@@ -3057,6 +3070,7 @@ if (this.debugMode)IJ.log("(in metroloJDialog>copy)original title: "+this.title+
     mjdCopy.showDisplacementFits=this.showDisplacementFits;
     mjdCopy.useAbsoluteValues=this.useAbsoluteValues;
     mjdCopy.outliers = this.outliers;
+    mjdCopy.outlierMode=this.outlierMode;
     mjdCopy.shorten = this.shorten;
     mjdCopy.openPdf = this.openPdf;
     mjdCopy.savePdf = this.savePdf;

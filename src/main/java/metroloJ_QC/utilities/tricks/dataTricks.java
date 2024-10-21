@@ -1,9 +1,11 @@
 package metroloJ_QC.utilities.tricks;
 
+import ij.IJ;
 import ij.measure.Calibration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import metroloJ_QC.setup.MetroloJDialog;
 import metroloJ_QC.setup.QC_Options;
 /**
  * This class contains static methods used to deal with numbers or lists
@@ -11,6 +13,10 @@ import metroloJ_QC.setup.QC_Options;
 public class dataTricks {
   public static final int MIN = 0;
   public static final int MAX = 1;
+// final variable used for outlier's fences
+    public static final int LOWER_FENCE=0;
+    public static final int UPPER_FENCE=1;
+    public static final int SIGNIFICATIVITY=2;
  
   /**
    * rounds a double to a given number of digits
@@ -277,66 +283,71 @@ public class dataTricks {
    * @return a list of the same size as the input list, of boolean (false: not an outlier, true : outlier)
    */
   public static Double[] getOutliersFences(List<Double> input, int outlierMode) {
-    if (input.size()<5||input==null) return (new Double[]{Double.NaN, Double.NaN});
+    if (input.size()<5||input==null) {  
+        if (outlierMode==MetroloJDialog.USING_IQR) return (new Double[]{Double.NaN, Double.NaN});
+        else if(outlierMode==MetroloJDialog.USING_MEDIAN)return (new Double[]{Double.NaN, Double.NaN, Double.NaN});
+    }
     else {
-        switch (outlierMode){
-            case QC_Options.USING_IQR : 
-                Collections.sort(input);
-                List<Double> data1 = new ArrayList<>();
-                List<Double> data2 = new ArrayList<>();
-                if (input.size() % 2 == 0) {
-                    data1 = input.subList(0, input.size() / 2);
-                    data2 = input.subList(input.size() / 2, input.size());
-                } 
-                else {
-                    data1 = input.subList(0, input.size() / 2);
-                    data2 = input.subList(input.size() / 2 + 1, input.size());
-                } 
-                Double q1 = getMedian(data1);
-                Double q3 = getMedian(data2);
-                Double iqr = q3 - q1;
-                if (iqr != 0.0D&&!iqr.isNaN()&&!q1.isNaN()&&!q3.isNaN()) {
-                    double lowerFence = q1 - QC_Options.iqrFactor * iqr;
-                    double upperFence = q3 + QC_Options.iqrFactor * iqr;
-                    return(new Double[]{lowerFence, upperFence});
-                } 
-                else return (new Double[]{Double.NaN, Double.NaN});
-            case QC_Options.USING_MEDIAN :
-                Double median=getMedian(input);
-                if (!median.isNaN()){
-                    List<Double> drift = new ArrayList<>();
-                    for (Double value : input) {
-                        if (value != null && !Double.isNaN(value)) {
-                            drift.add(Math.abs(value-median));
-                        }
-                    }
-                    Double quantile=getQuantile(drift, QC_Options.outlierQuantile);
-                    Collections.sort(drift);
-                    data1 = new ArrayList<>();
-                    data2 = new ArrayList<>();
-                    if (drift.size() % 2 == 0) {
-                        data1 = drift.subList(0, drift.size() / 2);
-                        data2 = drift.subList(drift.size() / 2, drift.size());
-                    } 
-                    else {
-                        data1 = drift.subList(0, drift.size() / 2);
-                        data2 = drift.subList(drift.size() / 2 + 1, drift.size());
-                    } 
-                    iqr = getMedian(data2) - getMedian(data1);
-                    if (!iqr.isNaN()&&quantile.isNaN()){
-                        if (((quantile-median)/iqr)<1) return (new Double[]{Double.NaN, Double.NaN});
-                        else {
-                            double lowerFence = median-quantile;
-                            double upperFence = median+quantile;
-                        }
+        if (outlierMode==MetroloJDialog.USING_IQR) { 
+            Collections.sort(input);
+            List<Double> data1 = new ArrayList<>();
+            List<Double> data2 = new ArrayList<>();
+            if (input.size() % 2 == 0) {
+                data1 = input.subList(0, input.size() / 2);
+                data2 = input.subList(input.size() / 2, input.size());
+            } 
+            else {
+                data1 = input.subList(0, input.size() / 2);
+                data2 = input.subList(input.size() / 2 + 1, input.size());
+            } 
+            Double q1 = getMedian(data1);
+            Double q3 = getMedian(data2);
+            Double iqr = q3 - q1;
+            if (iqr != 0.0D&&!iqr.isNaN()&&!q1.isNaN()&&!q3.isNaN()) {
+                double lowerFence = q1 - QC_Options.iqrFactor * iqr;
+                double upperFence = q3 + QC_Options.iqrFactor * iqr;
+                return(new Double[]{lowerFence, upperFence});
+            } 
+            else return (new Double[]{Double.NaN, Double.NaN});
+        }    
+        else if(outlierMode==MetroloJDialog.USING_MEDIAN) {
+            Double median=getMedian(input);
+            if (!median.isNaN()){
+                List<Double> drift = new ArrayList<>();
+                for (Double value : input) {
+                    if (value != null && !Double.isNaN(value)) {
+                        drift.add(Math.abs(value-median));
                     }
                 }
-                break;
-        }  
-    }
-    return (new Double[]{Double.NaN, Double.NaN});
-  }   
-  
+                Double driftMedian=getMedian(drift);
+                Double quantile=getQuantile(drift, QC_Options.outlierQuantile);
+                Collections.sort(drift);
+                List<Double> data1 = new ArrayList<>();
+                List<Double> data2 = new ArrayList<>();
+                if (drift.size() % 2 == 0) {
+                    data1 = drift.subList(0, drift.size() / 2);
+                    data2 = drift.subList(drift.size() / 2, drift.size());
+                } 
+                else {
+                    data1 = drift.subList(0, drift.size() / 2);
+                    data2 = drift.subList(drift.size() / 2 + 1, drift.size());
+                } 
+                Double iqr = getMedian(data2) - getMedian(data1);
+                if (!iqr.isNaN()&&!quantile.isNaN()&&!driftMedian.isNaN()){
+                    Double significativity=(quantile-driftMedian)/iqr;
+                    if (significativity<1) return (new Double[]{Double.NaN, Double.NaN, significativity});
+                    else {
+                        double lowerFence = median-quantile;
+                        double upperFence = median+quantile;
+                        return(new Double[]{lowerFence, upperFence, significativity});
+                    }
+                }
+            }  
+        return (new Double[]{Double.NaN, Double.NaN, Double.NaN});
+        }
+    } 
+   return (null); 
+  }  
  
   /**
  * Retrieves a list of Double arrays, each containing a specified number of elements from the original list of double arrays.

@@ -33,7 +33,7 @@ import utilities.miscellaneous.SimpleActionBar;
  */
 public class MetroloJ_QC implements PlugIn, ActionListener, Runnable {
     // the plugin's version
-    public static final String VERSION="1.3.1";
+    public static final String VERSION="1.3.1.1";
 
     // the minimal ImageJ version that is necessary to run the plugin    
     public static final String IJ_VERSION="1.53e";

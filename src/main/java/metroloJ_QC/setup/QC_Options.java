@@ -21,13 +21,10 @@ public class QC_Options {
     public static final int FIXED_SCALEBAR=1;
     public static final int ADAPTIVE_SCALEBAR=2;
     public static final int SCALE_METHOD=1;
-    public static final int USING_IQR=0;
-    public static final int USING_MEDIAN=1;
     public static final String[] SCALE_METHODS=new String[]{"none", "bilinear","bicubic"};
     public final String PREF_KEY="General_selectedThresholdMethods.String";
     public boolean useVirtualStacks=Prefs.get("General_useVirtualStacks.boolean", true);
     public boolean allow32BitsImages=Prefs.get("General_allow32BitsImages.boolean", true);
-    public int outlierMode=1;
     public static double iqrFactor=1.5D;
     public static double outlierQuantile=0.9D;
     // a boolean used to allow scrollable dialogs

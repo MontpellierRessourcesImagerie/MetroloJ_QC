@@ -652,7 +652,6 @@ public class coAlignement {
    */
     public void saveData(String path, String filename, content[][]log) {
     if (this.mjd.analysisParametersSummary==null) this.mjd.getAnalysisParametersSummary(path);
-    IJ.log(path);
     fileTricks.save(getResultsSpreadsheetString(log), path + filename + "_results.xls");      
    
   }

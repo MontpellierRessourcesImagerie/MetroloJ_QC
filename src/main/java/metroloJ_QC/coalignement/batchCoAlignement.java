@@ -23,9 +23,6 @@ public class batchCoAlignement {
   public final int Y = 1;
   public final int Z = 2;
   public static final String[] dimensions=new String[] {"X","Y","Z"};
-// final variable used for outlier's fences
-  public static final int LOWER_FENCE=0;
-  public static final int UPPER_FENCE=1;
   
   // final variable used in the arrays containing the aggregated metrics
   public final int MEAN=0;
@@ -214,14 +211,13 @@ public void filterBeads(int combination){
     for (int k = 0; k < rawCoaValues[combination].size(); k++) {
         if (!rawCoaValues[combination].get(k).isFiltered) ratioValues.add(rawCoaValues[combination].get(k).ratio);
     }
-    fences[combination]=dataTricks.getOutliersFences(ratioValues, mjd.options.outlierMode);
-    if (fences[combination][LOWER_FENCE]==Double.NaN || fences[combination][UPPER_FENCE]==Double.NaN) return;
+    fences[combination]=dataTricks.getOutliersFences(ratioValues, mjd.outlierMode);
     for (int k = 0; k < rawCoaValues[combination].size(); k++) {
         if (!rawCoaValues[combination].get(k).isFiltered){
-            if (rawCoaValues[combination].get(k).ratio<fences[combination][LOWER_FENCE]||rawCoaValues[combination].get(k).ratio>fences[combination][UPPER_FENCE]) {
+            if ((!fences[combination][dataTricks.LOWER_FENCE].isNaN()&&rawCoaValues[combination].get(k).ratio<fences[combination][dataTricks.LOWER_FENCE])||(!fences[combination][dataTricks.UPPER_FENCE].isNaN()&&rawCoaValues[combination].get(k).ratio>fences[combination][dataTricks.UPPER_FENCE])) {
                 rawCoaValues[combination].get(k).isOutlier=true;
-                if (rawCoaValues[combination].get(k).ratio<fences[combination][LOWER_FENCE])rawCoaValues[combination].get(k).status="outlier (below lower fence of "+dataTricks.round(fences[combination][LOWER_FENCE],3)+""+IJ.micronSymbol+"m)";
-                if (rawCoaValues[combination].get(k).ratio>fences[combination][UPPER_FENCE])rawCoaValues[combination].get(k).status="outlier (above upper fence of "+dataTricks.round(fences[combination][UPPER_FENCE],3)+""+IJ.micronSymbol+"m)";
+                if (rawCoaValues[combination].get(k).ratio<fences[combination][dataTricks.LOWER_FENCE])rawCoaValues[combination].get(k).status="outlier (below lower fence of "+dataTricks.round(fences[combination][dataTricks.LOWER_FENCE],3)+""+IJ.micronSymbol+"m)";
+                if (rawCoaValues[combination].get(k).ratio>fences[combination][dataTricks.UPPER_FENCE])rawCoaValues[combination].get(k).status="outlier (above upper fence of "+dataTricks.round(fences[combination][dataTricks.UPPER_FENCE],3)+""+IJ.micronSymbol+"m)";
             }
             else rawCoaValues[combination].get(k).status="valid";
         }
@@ -514,15 +510,31 @@ public void filterBeads(int combination){
   public content [][] getFencesSummary() {
     int rows = this.combinations.length + 1;
     int cols = 3;
+    if (mjd.outlierMode==MetroloJDialog.USING_MEDIAN) cols++;
     content [][] output = new content [rows][cols];
     output[0][0] = new content("Combination",content.TEXT);
-    output[0][1]=new content("ratio Lower Fence",content.TEXT);
-    output[0][2]=new content("ratio Upper Fence",content.TEXT);
+    int refCol=1;
+    if (mjd.outlierMode==MetroloJDialog.USING_MEDIAN) {
+        output[0][1]=new content("ratios spread significativity",content.TEXT);
+        refCol++;
+    }
+    output[0][refCol]=new content("ratios Lower Fence",content.TEXT);
+    output[0][refCol+1]=new content("ratios Upper Fence",content.TEXT);
        
     for (int j = 0; j < this.combinations.length; j++) {
         output[j+1][0] = new content("Channel"+combinations[j][0]+" vs Channel"+combinations[j][1], content.TEXT);  
-        output[j+1][1]=new content(""+dataTricks.round(fences[j][LOWER_FENCE],3),content.TEXT);
-        output[j+1][2]=new content(""+dataTricks.round(fences[j][UPPER_FENCE],3),content.TEXT);
+        refCol=1;
+        if (mjd.outlierMode==MetroloJDialog.USING_MEDIAN) {
+            if (fences[j][dataTricks.SIGNIFICATIVITY]<1.0D) {
+                output[j+1][1]=new content("no significant differences (significativity of "+dataTricks.round(fences[j][dataTricks.SIGNIFICATIVITY],3)+")",content.TEXT);
+            }
+            else output[j+1][1]=new content(""+dataTricks.round(fences[j][dataTricks.SIGNIFICATIVITY],3),content.TEXT);
+            refCol++;
+        } 
+        if (fences[j][dataTricks.LOWER_FENCE].isNaN())output[j+1][refCol]=new content("NaN",content.TEXT);
+        else output[j+1][refCol]=new content(""+dataTricks.round(fences[j][dataTricks.LOWER_FENCE],3),content.TEXT);
+        if (fences[j][dataTricks.UPPER_FENCE].isNaN()) output[j+1][refCol+1]=new content("NaN",content.TEXT);
+        else output[j+1][refCol+1]=new content(""+dataTricks.round(fences[j][dataTricks.UPPER_FENCE],3),content.TEXT);
     }    
     if (mjd.debugMode) content.contentTableChecker(output, "getFencesSummary() output in batchCoAlignement)");
     return output;
@@ -671,7 +683,16 @@ public void filterBeads(int combination){
         this.combinations = ((coAlignement)coas.get(0)).combinations;
         this.refWavelengths = ((coAlignement)coas.get(0)).refWavelengths;
         refDist = coas.get(0).refDist;
-        fences=new Double [combinations.length][2];
+         if (mjd.outliers) {
+            switch(mjd.outlierMode){
+                case MetroloJDialog.USING_IQR:
+                    fences=new Double[combinations.length][2];
+                break;
+                case MetroloJDialog.USING_MEDIAN:
+                    fences=new Double[combinations.length][3];
+                break;
+            }
+        }
         compiledValues=new averageBeadsCoAlignementValues[combinations.length];
         if (mjd.outliers) fences=new Double[combinations.length][2];
         rawCoaValues = (ArrayList<beadCoAlignementValues>[]) new ArrayList[combinations.length];
