@@ -2739,7 +2739,9 @@ public void saveMetroloJDialogPrefs(){
         temp[currentRow][0] = new content("Measurement rejected", content.TEXT,batchRows,1);
         if (batchRows>1)for(int row=1; row<batchRows; row++)temp[currentRow+row][0] = new content();
         temp[currentRow][1] = new content("Outliers", content.TEXT);
-        temp[currentRow][2] = new content("" + outliers, content.LEFTTEXT);
+        String text=""+outliers;
+        if (outliers) text+=" ("+this.OUTLIER_METHODS[this.outlierMode]+")";
+        temp[currentRow][2] = new content(text, content.LEFTTEXT);
         currentRow++;
         if (reportType=="bpp") {//Reject PSF Profile with R2 below
             temp[currentRow][1] = new content("R2 ratio below", content.TEXT);
