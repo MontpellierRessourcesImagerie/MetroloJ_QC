@@ -236,7 +236,7 @@ public class PSFprofilerReport {
     if ((pp.mjd.saveImages | pp.mjd.saveSpreadsheet) != false) {
         if (pp.mjd.saveSpreadsheet){
             this.pp.saveData(dataFolder, pp.mjd.title+"_"+name, log);
-            fileTricks.save(pp.getQUAREPSummarySpreadsheetString(), reportFolder + pp.mjd.title + "_summary.xls");
+            if (pp.result) fileTricks.save(pp.getQUAREPSummarySpreadsheetString(), reportFolder + pp.mjd.title + "_summary.xls");
         }
         if (pp.mjd.saveImages) {
             for (int i = 0; i < this.pp.micro.emWavelengths.length;i++){

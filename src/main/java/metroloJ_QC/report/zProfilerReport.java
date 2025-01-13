@@ -54,7 +54,7 @@ public class zProfilerReport {
     ImagePlus[] profileImages = null;
     ImagePlus[] roiImages = null;
     zp.mjd.getAnalysisParametersSummary(reportFolder); 
-    if ((zp.mjd.savePdf||zp.mjd.saveImages)) {
+    if ((zp.mjd.saveSpreadsheet||zp.mjd.saveImages)) {
         (new File(dataFolder)).mkdirs();
     } 
     try {

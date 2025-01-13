@@ -27,7 +27,6 @@ import metroloJ_QC.utilities.doCheck;
 import metroloJ_QC.utilities.findBeads;
 import metroloJ_QC.utilities.tricks.StringTricks;
 import metroloJ_QC.utilities.tricks.fileTricks;
-import metroloJ_QC.utilities.tricks.imageTricks;
 
 
 public class multipleBeadsSummaryReport {
@@ -35,7 +34,7 @@ public class multipleBeadsSummaryReport {
 content[][] microscopeInformationSummary;
 
 // the metroloJDialog object associated with the void report 
-MetroloJDialog mjd;
+public MetroloJDialog mjd;
 
 public String saturationString="";
 
@@ -54,8 +53,9 @@ findBeads fb;
     public multipleBeadsSummaryReport(ImagePlus image, MetroloJDialog mjd, String[] creationInfo, String path, findBeads fb) {
         String name=fileTricks.cropName(image.getShortTitle());
         this.mjd=mjd;
+
         this.fb=fb;
-        this.mjd.getAnalysisParametersSummary(path);
+
         if (this.mjd.debugMode)content.contentTableChecker(mjd.analysisParametersSummary,"mjd.analysisParametersSummary as given by multipleBeadSummaryReport");
         microscope micro=mjd.createMicroscopeFromDialog(image.getCalibration());
         ImagePlus [] ip = ChannelSplitter.split(image);
@@ -82,7 +82,8 @@ findBeads fb;
     }
     
 public void saveReport(String reportFolder, String name, content[][] log){
-     String dataFolder = reportFolder+mjd.title+"_"+name+"_beadData"+File.separator;
+    String dataFolder = reportFolder+mjd.title+"_"+name+"_beadData"+File.separator;
+    this.mjd.getAnalysisParametersSummary(reportFolder);
      if (mjd.saveSpreadsheet||mjd.saveImages) {
         (new File(dataFolder)).mkdirs();
     }

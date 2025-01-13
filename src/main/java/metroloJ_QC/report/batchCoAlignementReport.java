@@ -70,7 +70,7 @@ public class batchCoAlignementReport {
             if (this.bcoa.finalIsoDistancesSummary==null)this.bcoa.getFinalIsoDistancesSummary();
         }
     }    
-    if ((bcoa.mjd.savePdf||bcoa.mjd.saveImages)) {
+    if ((bcoa.mjd.saveSpreadsheet||bcoa.mjd.saveImages)) {
             (new File(dataFolder)).mkdirs();
         }    
     try {

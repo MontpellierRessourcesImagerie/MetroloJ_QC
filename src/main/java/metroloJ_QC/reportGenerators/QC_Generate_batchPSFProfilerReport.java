@@ -9,7 +9,6 @@ import ij.plugin.PlugIn;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import metroloJ_QC.importer.importer;
@@ -85,7 +84,7 @@ public class QC_Generate_batchPSFProfilerReport implements PlugIn {
           Logger.getLogger(QC_Generate_batchPSFProfilerReport.class.getName()).log(Level.SEVERE, null, ex);
       }
     batchPSFProfilerReport bppr = new batchPSFProfilerReport(this.pps,this.mjd, this.path);
-    if (pps==null||pps.isEmpty()) return;
+    if (pps==null) return;
     else{
         if (this.pps.isEmpty()&& !this.options.disableIJMessages) IJ.error("Batch PSF Profiler report error", "No report generated, either previous reports with the same name were generated or no valid beads were found");
         String reportFolder = this.path + "Processed" + File.separator;
@@ -135,6 +134,7 @@ public class QC_Generate_batchPSFProfilerReport implements PlugIn {
         }
         
         this.mjd = new MetroloJDialog("Batch PSF Profiler report generator", options);
+
         mjd.addMetroloJDialog();
         mjd.showMetroloJDialog();
         if (mjd.wasCanceled()){
@@ -167,7 +167,8 @@ public class QC_Generate_batchPSFProfilerReport implements PlugIn {
                 String windowTitle = ip.getTitle();
                 name = StringTricks.getSeriesName(imp.filesToOpen.get(k).getPath(),windowTitle,imp.filesToOpen.get(k).getSeries());
             }
-            error=doCheck.checkAllWithASingleMessage(Checks.IS_CALIBRATED+Checks.IS_ZSTACK+Checks.IS_MULTICHANNEL+Checks.IS_EXPECTED_DEPTH, expectedChannelsNumber, mjd.bitDepth);
+            if (options.allow32BitsImages) error=doCheck.checkAllWithASingleMessage(Checks.IS_CALIBRATED+Checks.IS_ZSTACK+Checks.IS_MULTICHANNEL+Checks.IS_EXPECTED_DEPTH, expectedChannelsNumber, mjd.bitDepth);
+            else error=doCheck.checkAllWithASingleMessage(Checks.IS_NO_MORE_THAN_16_BITS+Checks.IS_CALIBRATED+Checks.IS_ZSTACK+Checks.IS_MULTICHANNEL+Checks.IS_EXPECTED_DEPTH, expectedChannelsNumber, mjd.bitDepth);
             if (!error.isEmpty()) {
                 foundBeads[k]=Double.NaN;
                 if (mjd.multipleBeads){
@@ -218,7 +219,6 @@ public class QC_Generate_batchPSFProfilerReport implements PlugIn {
                                     String samplingDensityString= doCheck.getSamplingDensityString(mjd.createMicroscopeFromDialog(ip.getCalibration()), mjd);
                                     individualLog.addMultipleBeadsImage(name, creationInfo[0], samplingDensityString, fb.beadTypes[Bead.RAW], fb.beadTypes[Bead.VALID], mbsr.saturationString, status);
                                     reportLog.addMultipleBeadsImage(name, creationInfo[0], samplingDensityString, fb.beadTypes[Bead.RAW], fb.beadTypes[Bead.VALID], mbsr.saturationString, status);
-                                    ip.close();                     
                                 }
                                 mbsr.saveReport(individualReportFolder, name, individualLog.getGeneratorLog());
                                 foundBeads[k]=0.0D;

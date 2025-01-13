@@ -673,7 +673,6 @@ public void filterBeads(int combination){
      * @param path : the folder path+ file suffix that should be used to save the spreadsheet files
      */
     public void saveData(String path, String filename, content log[][]) {
-    if (this.mjd.analysisParametersSummary==null) this.mjd.getAnalysisParametersSummary(path);
     fileTricks.save(getResultSpreadsheetString(log), path +filename+"_BatchSummary.xls");
     fileTricks.save(getRawDataSpreadsheetString(log), path +filename + "_BatchRawData.xls");
   }

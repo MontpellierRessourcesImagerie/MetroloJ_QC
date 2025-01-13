@@ -406,8 +406,7 @@ public class MetroloJDialog extends GenericDialog{
     this.options=options;
     BEADS_DETECTION_THRESHOLDS_METHODS=options.getThresholdsList(true, true);
     this.generator=generator;
-    this.ip = WindowManager.getCurrentImage();
-    if (this.options.showDebugOption) IJ.log("(inMetroloJDialog) number of channel of ip: "+this.ip.getNChannels());
+    this.ip = WindowManager.getCurrentImage().duplicate();
     Calibration cal = ip.getCalibration();
     DateFormat df = DateFormat.getDateTimeInstance(1, 3);
     this.date = df.format(Calendar.getInstance().getTime()).toString();
@@ -2491,6 +2490,7 @@ public void saveMetroloJDialogPrefs(){
             //bead size, bead crop factor, actual cropped size, 
             rows+=3;
             beadRows+=3;
+  
             if (ip.getNSlices()>1) {//bead rejection distance
                 rows++;
                 beadRows++;

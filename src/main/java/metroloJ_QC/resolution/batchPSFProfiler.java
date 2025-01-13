@@ -5,6 +5,7 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Objects;
 import metroloJ_QC.importer.importer;
 import metroloJ_QC.report.utilities.content;
 import static metroloJ_QC.report.utilities.content.extractString;
@@ -405,7 +406,6 @@ public static final String[] dimensions=new String[] {"X","Y","Z"};
    */
   public void saveData(String path, String filename, content[][]log) {
     if (this.mjd.debugMode)IJ.log("(in batchPSFProfiler>saveData) path: "+path);
-    if (this.mjd.analysisParametersSummary==null) this.mjd.getAnalysisParametersSummary(path);
     fileTricks.save(getResultSpreadsheetString(log), path +filename+"_BatchSummary.xls");
     fileTricks.save(getRawDataSpreadsheetString(log), path +filename+"_BatchRawData.xls");
   }

@@ -71,7 +71,7 @@ public class QC_Generate_batchFieldIlluminationReport implements PlugIn {
           Logger.getLogger(QC_Generate_batchFieldIlluminationReport.class.getName()).log(Level.SEVERE, null, ex);
       }
     batchFieldIlluminationReport bfir = new batchFieldIlluminationReport(this.fis, this.mjd, this.path);
-    if (fis==null||fis.isEmpty()) return; 
+    if (fis==null) return; 
     else {
         if (this.fis.isEmpty()&& !this.options.disableIJMessages) IJ.error("Batch Field Illumination report error", "No report generated, either previous reports with the same name were generated or no valid images were found");
         String reportFolder = this.path + "Processed" + File.separator;
@@ -152,7 +152,8 @@ public class QC_Generate_batchFieldIlluminationReport implements PlugIn {
                 String windowTitle = ip.getTitle();
                 name = StringTricks.getSeriesName(imp.filesToOpen.get(k).getPath(),windowTitle,imp.filesToOpen.get(k).getSeries());
             }            
-            error=doCheck.checkAllWithASingleMessage(Checks.IS_CALIBRATED+Checks.IS_ZSTACK+Checks.IS_MULTICHANNEL+Checks.IS_EXPECTED_DEPTH, expectedChannelsNumber, mjd.bitDepth);
+            if (options.allow32BitsImages) error=doCheck.checkAllWithASingleMessage(Checks.IS_CALIBRATED+Checks.IS_MULTICHANNEL+Checks.IS_EXPECTED_DEPTH, expectedChannelsNumber, mjd.bitDepth);
+            else error=doCheck.checkAllWithASingleMessage(Checks.IS_CALIBRATED+Checks.IS_NO_MORE_THAN_16_BITS+Checks.IS_MULTICHANNEL+Checks.IS_EXPECTED_DEPTH, expectedChannelsNumber, mjd.bitDepth);
             if (!error.isEmpty()) {
                 reportLog.addImage(name, creationInfo[0], null, error);
                 ip.close();

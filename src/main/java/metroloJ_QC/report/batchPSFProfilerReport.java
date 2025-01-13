@@ -56,7 +56,7 @@ if (bpp.mjd.debugMode)IJ.log("(in batchPSFProfilerReport) bpp.resolutionTable is
         if (this.bpp.finalRatiosSummary==null) this.bpp.getFinalRatiosSummary();    
         if (this.bpp.finalResolutionsSummary==null) this.bpp.getFinalResolutionsSummary();
     }
-    if ((bpp.mjd.savePdf||bpp.mjd.saveImages)) {
+    if ((bpp.mjd.saveImages||bpp.mjd.saveSpreadsheet)) {
             (new File(dataFolder)).mkdirs();
         }   
     
@@ -171,8 +171,7 @@ if (bpp.mjd.debugMode)IJ.log("(in batchPSFProfilerReport) bpp.resolutionTable is
     } 
     if (bpp.mjd.saveSpreadsheet) {
         bpp.saveData(dataFolder, bpp.mjd.title, log);
-        fileTricks.save(bpp.getQUAREPSummarySpreadsheetString(imp, foundBeads), reportFolder + bpp.mjd.title + "_summary.xls");
-
+        if (bpp.result) fileTricks.save(bpp.getQUAREPSummarySpreadsheetString(imp, foundBeads), reportFolder + bpp.mjd.title + "_summary.xls");
     }
   }
 }

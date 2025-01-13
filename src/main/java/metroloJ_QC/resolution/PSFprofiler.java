@@ -12,6 +12,7 @@ import java.awt.Color;
 import java.io.File;
 import java.text.DateFormat;
 import java.util.Calendar;
+import java.util.Objects;
 import metroloJ_QC.report.utilities.content;
 import static metroloJ_QC.report.utilities.content.extractString;
 import metroloJ_QC.setup.microscope;
@@ -93,7 +94,7 @@ public Double [] originalBeadCoordinates={Double.NaN, Double.NaN};
   
   // an array that contains all FWHM/resolution values for all detectorNames and all dimensions as obtained after gaussian
   // curve fitting. res[0][0,1 or 2] stores the resolution value for testChannel 0 in the X, Y and Z dimensions respectively
-  public double[][] res = null;
+  public Double[][] res = null;
   
   public double[] anulusThickness;
   
@@ -216,14 +217,6 @@ public PSFprofiler(ImagePlus image, MetroloJDialog mjd, String originalImageName
     output.getFittedValues();
     this.res[channel][dimension] = 2.0D * SQRT2LN2 * output.params[CurveFitterPlus.GAUSSIAN_WIDTH];
   return (output);
-  }
-  
- /**
- * Retrieves a two-dimension array containing the measured resolutions/FWHM values as a [testChannel][dimension] array.
- * @return a two-dimension array containing the measured resolutions/FWHM values as a [testChannel][dimension] array
- */
-    public double[][] getResolutions() {
-    return this.res;
   }
   
 
@@ -600,7 +593,6 @@ public PSFprofiler(ImagePlus image, MetroloJDialog mjd, String originalImageName
  * @param log: a content 2D array that contains the table showing how files were handled
  */
   public void saveData(String path, String filename, content [][]log) {
-    if (this.mjd.analysisParametersSummary==null) this.mjd.getAnalysisParametersSummary(path);
     fileTricks.save(getResultsSpreadsheetString(log), path + filename + "_results.xls");
     if (!this.mjd.shorten) fileTricks.save(getProfilesSpreadsheetString(log), path + filename + "_profiles.xls");
   }
@@ -655,7 +647,10 @@ public PSFprofiler(ImagePlus image, MetroloJDialog mjd, String originalImageName
   
    // Generates a BeadResolutionValues object out of the PSFProfiler measurements
   public beadResolutionValues getRawBeadResolutionValues(int dimension, int channel){
-      if (!(mjd.saturationChoice&&saturation[channel]>0.0D))return((new beadResolutionValues(beadName, originalBeadCoordinates, res[channel][dimension], fittedValues[channel][dimension].R2, SBRatio[channel],micro.resolutions.get(channel)[dimension])));
+      if (!(mjd.saturationChoice&&saturation[channel]>0.0D)){
+          if (res[channel][dimension].isNaN())return((new beadResolutionValues(beadName, originalBeadCoordinates)));
+          else return((new beadResolutionValues(beadName, originalBeadCoordinates, res[channel][dimension], fittedValues[channel][dimension].R2, SBRatio[channel],micro.resolutions.get(channel)[dimension])));
+      }
       else return((new beadResolutionValues(beadName, originalBeadCoordinates)));
   }
   /**
@@ -666,7 +661,7 @@ public PSFprofiler(ImagePlus image, MetroloJDialog mjd, String originalImageName
    SBRatio = new double[ip.length];
    anulusThickness=new double[ip.length];
    innerAnulusEdgeDistanceToBead=new double[ip.length];
-   res = new double[ip.length][3];
+   res = new Double[ip.length][3];
    for (int i = 0; i < ip.length; i++) {
       for (int dim = 0; dim < 3; dim++)res[i][dim] = 0.0D;
   } 

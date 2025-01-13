@@ -78,7 +78,7 @@ public class batchFieldIlluminationReport {
             if (log!=null) {
                 sectionTitle = "Warnings:";
                 text = "(no saturation issue detected)";
-                if (tableDoesNotAlwaysContain(log, "none", 1, log.length, 2, 2)){
+                if (tableDoesNotAlwaysContain(log, "none", 1, log.length-1, 2, 2)){
                     text = "saturation issues reported for one or more files (see Analysed images section below)";
                 }
                 report.add((Element)rs.wholeSection(sectionTitle, rs.TITLE, null, text));

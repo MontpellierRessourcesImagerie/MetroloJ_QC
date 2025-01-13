@@ -56,60 +56,49 @@ public content[][] filterWheelParameters;
    * @param dateInfo is a string array containing the image's creation date [0] and how this date was retrieved [1]
    */
   public void getFilterWheelParameters(String name, MetroloJDialog mjd, double[] saturation, String [] dateInfo) {
-    boolean showWavelengths=true;
-    if (mjd.discardWavelengthSpecs) showWavelengths=false;
-    int rows = 6+this.emWavelengths.length;
+    int rows = 5+this.emWavelengths.length;
     int cols = 3;
-    if (showWavelengths) cols+=2;
+    if (!mjd.discardWavelengthSpecs) {
+        cols+=2;
+        rows++;
+    }
     content[][] temp = new content[rows][cols];
-    
+    for(int col=0; col<cols; col++){
+        for (int row=0; row<rows;row++) temp[row][col] = new content();
+    }
     temp[0][0] = new content("Image",content.TEXT, 1, 2);
-    temp[0][1]=new content();
     temp[0][2] = new content(name, content.LEFTTEXT, 1, cols-2);
-    for (int col = 3; col < cols; col++ ) {
-      temp[0][col] = new content();
-    } 
     temp[1][0] = new content("image's creation", content.TEXT, 2, 1);
-    temp[2][0] = new content();
     temp[1][1] = new content("date", content.TEXT);
     temp[1][2] = new content(dateInfo[0], content.LEFTTEXT, 1, cols-2);
     temp[2][1] = new content("method used", content.TEXT);
     temp[2][2] = new content(dateInfo[1], content.LEFTTEXT, 1, cols-2);
-    for (int col = 3; col < cols; col++ ) {
-      temp[1][col] = new content();
-      temp[2][col]=new content();
-    } 
     temp[3][0] = new content("Actual image depth", content.TEXT,1,2);
-    temp[3][1]=new content();
     temp[3][2] = new content("" + this.bitDepth, content.LEFTTEXT, 1, cols-2);
-    for (int col = 3; col < cols; col++ ) {
-      temp[3][col] = new content();
-    }
     int refRow=4;
     int refCol=2;
-    
-    temp[refRow][0] = new content("Filter combination(s)", content.TEXT, 2, 2);
-    temp[refRow+1][0] = new content();
-    temp[refRow+1][1]= new content();
-    temp[refRow][1]= new content();
-    
-    if (showWavelengths) {
+
+    if (!mjd.discardWavelengthSpecs) {
+        temp[refRow][0] = new content("Filter combination(s)", content.TEXT, 2, 2);
         temp[refRow][refCol] = new content("Wavelengths", content.TEXT, 1, 2);
         temp[refRow][refCol+1]=new content();
         temp[refRow+1][refCol]=new content("Ex. (nm)",content.TEXT);
         temp[refRow+1][refCol+1]=new content("Em. (nm)",content.TEXT);
         refCol+=2;
+        temp[refRow][refCol] = new content("Saturation", content.TEXT, 2, 1);
+        refRow+=2;
     }
-    temp[refRow][refCol] = new content("Saturation", content.TEXT, 2, 1);
-    temp[refRow+1][refCol]=new content();
-    refCol++;
-    refRow+=2;
+    else {
+      temp[refRow][0] = new content("Channel(s)", content.TEXT, 1, 2);
+      temp[refRow][refCol] = new content("Saturation", content.TEXT);
+      refRow++;
+    }
+ 
     for (int i = 0; i < this.emWavelengths.length; i++) {
         if (mjd.discardWavelengthSpecs)temp[refRow+i][0] = new content("Channel " + i, content.TEXT, 1, 2);
         else temp[refRow+i][0] = new content(filterSets[i], content.TEXT, 1, 2);
-        temp[refRow+i][1] = new content();
         refCol=2;
-        if (showWavelengths){
+        if (!mjd.discardWavelengthSpecs){
             temp[refRow+i][refCol]=new content("" + this.exWavelengths[i], content.TEXT);
             temp[refRow+i][refCol+1]=new content("" + this.emWavelengths[i], content.TEXT);
         refCol+=2;
@@ -126,7 +115,6 @@ public content[][] filterWheelParameters;
         }
         refCol++;    
     } 
-    refRow+=emWavelengths.length; 
     this.filterWheelParameters = temp;
     if (mjd.debugMode) content.contentTableChecker(this.filterWheelParameters, "filterWheelParameters (as given by filterWheel>getfilterWheelParametersParameters)");
   }
@@ -142,70 +130,52 @@ public content[][] filterWheelParameters;
    */
   public void getGenericFilterWheelParameters(MetroloJDialog mjd, String path, String[] saturationProportion, int nReports) {
     boolean showSaturation=true;
-    boolean showWavelengths=true;
-    if (mjd.discardWavelengthSpecs) showWavelengths=false;
     if (saturationProportion==null)showSaturation=false;
     int rows = 5+this.emWavelengths.length;
     int cols = 2;
-    if (showSaturation) cols++;
-    if (showWavelengths) cols+=2;
-    if(!showSaturation&&!showWavelengths) cols++;
+    if (!mjd.discardWavelengthSpecs) cols+=2;
     content[][] temp = new content[rows][cols];
-    temp[0][0] = new content("data",content.TEXT, 1, 2);
-    temp[0][1]=new content();
-    temp[0][2] = new content(""+nReports+" analysed images", content.LEFTTEXT, 1, cols-2);
-    for (int col = 3; col < cols; col++ ) {
-      temp[0][col] = new content();
-    } 
-    temp[1][0] = new content("images location", content.TEXT, 1, 2);
-    temp[1][1] = new content();
-    temp[1][2] = new content(path, content.LEFTTEXT, 1, cols-2);
-    for (int col = 3; col < cols; col++ ) {
-      temp[1][col] = new content();
-    } 
-    temp[2][0] = new content("Actual image depth", content.TEXT,1,2);
-    temp[2][1]=new content();
-    temp[2][2] = new content("" + this.bitDepth, content.LEFTTEXT, 1, cols-2);
-    for (int col = 3; col < cols; col++ ) {
-      temp[2][col] = new content();
+    for(int col=0; col<cols; col++){
+        for (int row=0; row<rows;row++) temp[row][col] = new content();
     }
+    temp[0][0] = new content("data",content.TEXT);
+    temp[0][1] = new content(""+nReports+" analysed images", content.LEFTTEXT, 1, cols-1);
+    temp[1][0] = new content("images location", content.TEXT);
+    temp[1][1] = new content(path, content.LEFTTEXT, 1, cols-2);
+    temp[2][0] = new content("Actual image depth", content.TEXT);
+    temp[2][1] = new content("" + this.bitDepth, content.LEFTTEXT, 1, cols-1);
     int refRow=3;
-    int refCol=2;
-    if (mjd.discardWavelengthSpecs) temp[refRow][0] = new content("Channel(s)", content.TEXT, 2, 2);
-    else temp[refRow][0] = new content("Filter combination(s)", content.TEXT, 2, 2);
-    temp[refRow+1][0] = new content();
-    temp[refRow+1][1]= new content();
-    temp[refRow][1]= new content();
-    
-    if (showWavelengths) {
+    int refCol=1;
+    if (mjd.discardWavelengthSpecs) {
+        temp[refRow][0] = new content("Channel(s)", content.TEXT);
+        if(showSaturation) temp[refRow][refCol] = new content("unsaturated/total images", content.TEXT);
+        refRow+=2;
+    }
+    else {
+        temp[refRow][0] = new content("Filter combination(s)", content.TEXT,2,1);
         temp[refRow][refCol] = new content("Wavelengths", content.TEXT, 1, 2);
-        temp[refRow][refCol+1]=new content();
         temp[refRow+1][refCol]=new content("Ex. (nm)",content.TEXT);
         temp[refRow+1][refCol+1]=new content("Em. (nm)",content.TEXT);
         refCol+=2;
+        if(showSaturation) temp[refRow][refCol] = new content("unsaturated/total images", content.TEXT, 2, 1);
+        refRow++;
     }
-    if(showSaturation) {
-        temp[refRow][refCol] = new content("unsaturated/total images", content.TEXT, 2, 1);
-        temp[refRow+1][refCol]=new content();
-        refCol++;
-    }
-   refRow+=2;   
+      
    for (int i = 0; i < this.emWavelengths.length; i++) {
-        if (mjd.discardWavelengthSpecs) temp[refRow+i][0] = new content("Channel " + i, content.TEXT, 1, 2);
-        else temp[refRow+i][0] = new content(filterSets[i], content.TEXT, 1, 2);
-        temp[refRow+i][1] = new content();
-        refCol=2;
-        if (showWavelengths){
+        refCol=1;
+        if (!mjd.discardWavelengthSpecs) {
+            temp[refRow+i][0] = new content(filterSets[i], content.TEXT);
             temp[refRow+i][refCol]=new content("" + this.exWavelengths[i], content.TEXT);
             temp[refRow+i][refCol+1]=new content("" + this.emWavelengths[i], content.TEXT);
             refCol+=2;
         }
+        else {
+            temp[refRow+i][0] = new content("Channel " + i, content.TEXT);
+        }
         if(showSaturation) {
             temp[refRow + i][refCol] = new content(saturationProportion[i], content.TEXT);
-            refCol++; 
         }  
     } 
-    refRow+=emWavelengths.length; 
     this.filterWheelParameters = temp;
     if (mjd.debugMode) content.contentTableCheckerPlus(this.filterWheelParameters, "FilterWheelParameters (as given by FilterWheel>getGenericFilterWheelParameters)");
   }
