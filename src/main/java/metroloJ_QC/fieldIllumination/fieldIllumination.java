@@ -308,7 +308,9 @@ public class fieldIllumination {
                 } 
             } 
         } 
-    } 
+    }
+    RoiManager rm=RoiManager.getRoiManager();
+    rm.reset();
 }
   /** 
    * Generates the profile images along the diagonals and horizontal/vertical lines. 
@@ -366,7 +368,8 @@ public class fieldIllumination {
             } 
             out[i] = plot.getImagePlus();
         }
-    }    
+    }
+    rm.reset();
     return out;
   }
 /**
@@ -412,6 +415,7 @@ public void getCValues(int channel) {
         Double temp=Double.NaN;
         if (!values[0].isNaN()&& ! values[1].isNaN()) temp=(values[0]+values[1])/2;
         cFitValues[channel]=temp;
+        rm.reset();
         }
     }
 /**  
@@ -506,6 +510,7 @@ public ImagePlus[] getIntensityCenterProfilesImage(){
             overlay.add(legend);
             panels.setOverlay(overlay);
             output[i]=panels;
+            rm.reset();
         }
     }
     return(output);
@@ -855,7 +860,6 @@ public String getIntensityProfilesResultSpreadsheetString(content[][] log){
 
  */  
 public void saveData(String path, String filename, content[][] log) {
-    if (this.mjd.analysisParametersSummary==null) this.mjd.getAnalysisParametersSummary(path);
     fileTricks.save(getResultSpreadsheetString(log), path + filename + "_stats.xls");
     fileTricks.save(getResultsSpreadsheetString(log), path + filename + "_results.xls");
     if (!this.mjd.shorten) fileTricks.save(getIntensityProfilesResultSpreadsheetString(log), path + filename + "_intensityProfiles.xls");     

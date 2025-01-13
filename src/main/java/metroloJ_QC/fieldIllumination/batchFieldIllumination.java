@@ -204,7 +204,6 @@ public void getResultsSummary(ArrayList<fieldIllumination> fis) {
      * @param log
    */
   public void saveData(String path, String filename, ArrayList<fieldIllumination> fis, content[][]log) {
-    if (this.mjd.analysisParametersSummary==null) this.mjd.getAnalysisParametersSummary(path);
     fileTricks.save(getResultSpreadsheetString(fis, log), path +filename+"_BatchSummary.xls");
   }
   /** Puts all tables (microscope, result and analysis parameters) information into a single String

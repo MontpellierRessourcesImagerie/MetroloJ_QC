@@ -1317,7 +1317,6 @@ public content[][] getMSDSummary(){
  * @param log: a content 2D array that contains the table showing how files were handled
  */
   public void saveData(String path, String filename, content [][]log) {
-    if (this.mjd.analysisParametersSummary==null) this.mjd.getAnalysisParametersSummary(path);
     if (mjd.debugMode) IJ.log ("in driftProfiler>saveData) path: "+path);
     fileTricks.save(getPositionSpreadsheetString(log), path + filename + "_position.xls"); 
     fileTricks.save(getResultsSpreadsheetString(log), path + filename + "_results.xls");

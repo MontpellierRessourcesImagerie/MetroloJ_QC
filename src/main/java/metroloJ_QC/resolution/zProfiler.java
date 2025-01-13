@@ -265,7 +265,6 @@ double[] resol;
 
  */  
 public void saveData(String path, String filename, content[][] log) {
-    if (this.mjd.analysisParametersSummary==null) this.mjd.getAnalysisParametersSummary(path);
     fileTricks.save(getResultSpreadsheetString(log), path + filename + "_results.xls");
     fileTricks.save(saveProfileAsString(log), path + filename + "_profiles.xls");
 }

@@ -86,7 +86,7 @@ public class QC_Generate_batchCoAlignementReport implements PlugIn {
         coas = new ArrayList<>();   
         generateCoARs();
         batchCoAlignementReport bcoar= new batchCoAlignementReport(this.coas, this.mjd, this.path);
-        if (coas==null||coas.isEmpty()) return; 
+        if (coas==null) return; 
         else{
             if (this.coas.isEmpty()&& !this.options.disableIJMessages) IJ.error("Batch co-alignment report error", "No report generated, either previous reports with the same name were generated or no valid beads were found");
             String reportFolder = this.path + "Processed" + File.separator;
@@ -172,7 +172,8 @@ public class QC_Generate_batchCoAlignementReport implements PlugIn {
                 name = StringTricks.getSeriesName(imp.filesToOpen.get(k).getPath(),windowTitle,imp.filesToOpen.get(k).getSeries());
             }
             if (mjd.debugMode)IJ.log("(in Generate_BatchCoAlignementReport>generateCoARs) name: "+name);
-            error=doCheck.checkAllWithASingleMessage(Checks.IS_CALIBRATED+Checks.IS_ZSTACK+Checks.IS_MULTICHANNEL+Checks.IS_EXPECTED_DEPTH, expectedChannelsNumber, mjd.bitDepth);
+            if (options.allow32BitsImages) error=doCheck.checkAllWithASingleMessage(Checks.IS_CALIBRATED+Checks.IS_ZSTACK+Checks.IS_MULTICHANNEL+Checks.IS_EXPECTED_DEPTH, expectedChannelsNumber, mjd.bitDepth);
+            else error=doCheck.checkAllWithASingleMessage(Checks.IS_NO_MORE_THAN_16_BITS+Checks.IS_CALIBRATED+Checks.IS_ZSTACK+Checks.IS_MULTICHANNEL+Checks.IS_EXPECTED_DEPTH, expectedChannelsNumber, mjd.bitDepth);
             if (!error.isEmpty()) {
                 if (mjd.multipleBeads){
                     individualLog.addMultipleBeadsImage(name, creationInfo[0], null, -1, -1, null, error);

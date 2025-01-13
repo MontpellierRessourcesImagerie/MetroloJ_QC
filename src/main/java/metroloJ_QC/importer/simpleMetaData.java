@@ -21,7 +21,6 @@ import loci.formats.ImageReader;
 import loci.formats.MetadataTools;
 import loci.formats.meta.IMetadata;
 import loci.plugins.util.ImageProcessorReader;
-import metroloJ_QC.reportGenerators.QC_Generate_FieldIlluminationReport;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
@@ -53,7 +52,7 @@ public static String getCreationDate(ImagePlus image, boolean debugMode){
 	  SimpleDateFormat simpleDateFormat = new SimpleDateFormat(pattern);
 	  output=simpleDateFormat.format(date);
       } catch (IOException ex) {
-          Logger.getLogger(QC_Generate_FieldIlluminationReport.class.getName()).log(Level.SEVERE, null, ex);
+          Logger.getLogger(simpleMetaData.class.getName()).log(Level.SEVERE, null, ex);
       }
     if (debugMode)IJ.log("(in simpleMetaData>getCreationDate) image creation date "+output);
     return (output);
@@ -108,7 +107,7 @@ public static String getOMECreationDate(ImagePlus image, boolean debugMode) {
                 output=simpleDateFormat.format(date);
                 output+=" (from file creation date)";
             } catch (IOException ex) {
-            Logger.getLogger(QC_Generate_FieldIlluminationReport.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(simpleMetaData.class.getName()).log(Level.SEVERE, null, ex);
             }
             if (debugMode)IJ.log("(in SimpleMetadata>getOMECreationDate) image creation date from file "+output);  
         }
@@ -168,7 +167,7 @@ public static String [] getOMECreationInfos(ImagePlus image, boolean debugMode) 
                 output[0]=simpleDateFormat.format(date);
                 output[1]="from file creation date";
             } catch (IOException ex) {
-            Logger.getLogger(QC_Generate_FieldIlluminationReport.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(simpleMetaData.class.getName()).log(Level.SEVERE, null, ex);
             }
             if (debugMode)IJ.log("(in SimpleMetadata>getOMECreationDate) image creation date from file "+output);  
         }
